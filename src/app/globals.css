@@ -1,0 +1,49 @@
+@import "tailwindcss";
+
+@theme inline {
+  --color-navy: #0b1f3a;
+  --color-navy-deep: #071428;
+  --color-gold: #c9a227;
+  --color-gold-ink: #8a6d12;
+  --color-gold-soft: #fff6db;
+  --color-sand: #f5f3ee;
+  --color-line: #e3e0d8;
+  --color-muted: #5b6472;
+  --color-mist: #c7d0dd;
+  --color-halved: #8a93a1;
+  --font-sans: var(--font-inter), system-ui, sans-serif;
+  --font-display: var(--font-barlow), "Arial Narrow", sans-serif;
+}
+
+html,
+body {
+  background: var(--color-sand);
+  color: var(--color-navy);
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Keep the app phone-shaped on big screens. */
+.app-shell {
+  max-width: 480px;
+  margin: 0 auto;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-sand);
+}
+
+@keyframes drum {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.12); }
+}
+.animate-drum {
+  animation: drum 0.5s ease-in-out infinite;
+}
+
+@keyframes pop {
+  from { transform: scale(0.6); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+.animate-pop {
+  animation: pop 0.45s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
