@@ -106,4 +106,13 @@ export const DDL: string[] = [
     at TEXT NOT NULL,
     actor TEXT NOT NULL
   )`,
+  `CREATE TABLE IF NOT EXISTS demo (
+    event_id TEXT PRIMARY KEY REFERENCES events(id),
+    plan TEXT NOT NULL,
+    cursor INTEGER NOT NULL DEFAULT 0,
+    clock REAL NOT NULL DEFAULT 0,
+    running_since TEXT,
+    speed REAL NOT NULL DEFAULT 1,
+    started_at TEXT NOT NULL
+  )`,
 ];

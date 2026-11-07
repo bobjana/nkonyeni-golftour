@@ -1,5 +1,6 @@
 import { requireOrganizer } from "@/lib/auth";
 import { getDb } from "@/lib/db";
+import { demoEnabled } from "@/lib/demo";
 import { AdminTabs } from "./AdminTabs";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -13,7 +14,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           <span className="text-xs font-bold tracking-wider text-gold">ORGANIZER</span>
           <span className="text-xs text-mist">{event.name}</span>
         </div>
-        <AdminTabs />
+        <AdminTabs demo={demoEnabled()} />
       </header>
       <div className="flex flex-col gap-3 p-3.5">{children}</div>
     </div>

@@ -1,5 +1,7 @@
 import { notFound, redirect } from "next/navigation";
+import { DemoTicker } from "@/components/DemoTicker";
 import { currentTour } from "@/lib/current";
+import { demoStatus } from "@/lib/demo";
 import { scorerMatches } from "@/lib/tour";
 import { sessionTitle } from "@/lib/view";
 import { ScoreCard, type CardMatch } from "./ScoreCard";
@@ -49,16 +51,20 @@ export default async function ScorePage({ params, searchParams }: { params: Prom
     };
   });
 
+  const demo = await demoStatus(tour.event.id);
   return (
-    <ScoreCard
-      sessionId={s.session.id}
-      title={sessionTitle(s)}
-      format={s.session.format}
-      teeName={tee?.name ?? ""}
-      holes={s.played.map((h) => ({ ...h, length: lengths[h.number - 1] }))}
-      hidden={day.day.revealed_at ? [] : s.hidden}
-      teams={tour.teams.map((t) => ({ name: t.name, color: t.color }))}
-      matches={matches}
-    />
+    <>
+      {demo && !demo.finished && <DemoTicker running={demo.running} organizer={!!me.is_organizer} />}
+      <ScoreCard
+        sessionId={s.session.id}
+        title={sessionTitle(s)}
+        format={s.session.format}
+        teeName={tee?.name ?? ""}
+        holes={s.played.map((h) => ({ ...h, length: lengths[h.number - 1] }))}
+        hidden={day.day.revealed_at ? [] : s.hidden}
+        teams={tour.teams.map((t) => ({ name: t.name, color: t.color }))}
+        matches={matches}
+      />
+    </>
   );
 }

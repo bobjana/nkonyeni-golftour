@@ -128,6 +128,27 @@ export function ScoreCard({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [flush, qk]);
 
+  // Pick up holes entered elsewhere (another phone, or the demo) when the page refreshes.
+  useEffect(() => {
+    setScores((prev) => {
+      let changed = false;
+      const next = structuredClone(prev);
+      for (const m of matches)
+        for (const [entityId, byHole] of Object.entries(m.scores))
+          for (const [h, strokes] of Object.entries(byHole)) {
+            const row = ((next[m.id] ??= {})[entityId] ??= {});
+            if (row[Number(h)] === undefined) {
+              row[Number(h)] = strokes;
+              changed = true;
+            }
+          }
+      if (!changed) return prev;
+      setIdx((i) => (i < holes.length && holeDone(next, holes[i].number) ? firstOpen(next) : i));
+      return next;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [matches]);
+
   const done = idx >= holes.length;
   const hole = holes[Math.min(idx, holes.length - 1)];
 

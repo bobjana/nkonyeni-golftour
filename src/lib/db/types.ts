@@ -121,6 +121,20 @@ export interface ScoreLogRow {
   actor: string;
 }
 
+/** The in-app demo: a timeline of actions replayed against the event as time passes. */
+export interface DemoRow {
+  event_id: string;
+  /** JSON DemoPlan (see lib/demo-plan.ts) */
+  plan: string;
+  /** index of the next action to apply */
+  cursor: number;
+  /** demo seconds banked before running_since (the whole clock while paused) */
+  clock: number;
+  running_since: string | null;
+  speed: number;
+  started_at: string;
+}
+
 export interface Database {
   events: EventRow;
   teams: TeamRow;
@@ -134,4 +148,5 @@ export interface Database {
   matches: MatchRow;
   scores: ScoreRow;
   score_log: ScoreLogRow;
+  demo: DemoRow;
 }
