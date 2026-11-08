@@ -57,7 +57,7 @@ export async function demoStatus(eventId: string): Promise<DemoStatus | null> {
     total: plan.actions.length,
     recent: plan.actions.slice(Math.max(0, row.cursor - 6), row.cursor).reverse().map((a) => a.text),
     next: next ? { moment: next.moment!, inSeconds: Math.max(0, Math.round((next.t - clock) / row.speed)) } : null,
-    waiting: await waitingFor(plan.actions[row.cursor], clock),
+    waiting: await waitingFor(plan.actions[row.cursor], clock, plan.handback),
     remaining: Math.max(0, Math.round((last.t - clock) / row.speed)),
   };
 }
@@ -122,14 +122,16 @@ async function retime(eventId: string, change: (row: DemoRow, clock: number) => 
 }
 
 export const pauseDemo = (eventId: string) => retime(eventId, () => ({ running_since: null }));
-export const resumeDemo = (eventId: string) => retime(eventId, () => ({ running_since: nowIso() }));
+/** Resuming hands every group back to the simulator, which carries on from the holes nobody has entered. */
+export const resumeDemo = (eventId: string) =>
+  retime(eventId, (row) => ({ running_since: nowIso(), plan: JSON.stringify({ ...(JSON.parse(row.plan) as DemoPlan), handback: nowIso() }) }));
 export const setDemoSpeed = (eventId: string, speed: number) => retime(eventId, () => ({ speed: SPEEDS.includes(speed) ? speed : 1 }));
 
 /**
- * Groups where a real player has saved a score: the simulated scorer leaves
- * those to them for the rest of the session.
+ * Groups where a real player has saved a score since the last Resume: the
+ * simulated scorer leaves those to them.
  */
-async function humanGroups(sessionId: string): Promise<Set<number>> {
+async function humanGroups(sessionId: string, since: string | undefined): Promise<Set<number>> {
   const db = await getDb();
   const matches = await db.selectFrom("matches").select(["id", "group_no"]).where("session_id", "=", sessionId).execute();
   if (!matches.length) return new Set();
@@ -140,17 +142,18 @@ async function humanGroups(sessionId: string): Promise<Set<number>> {
     .where("match_id", "in", matches.map((m) => m.id))
     .where("actor", "not like", "demo:%")
     .where("actor", "not like", "ruling:%")
+    .where("at", ">", since ?? "")
     .execute();
   const ids = new Set(rows.map((r) => r.match_id));
   return new Set(matches.filter((m) => ids.has(m.id)).map((m) => m.group_no));
 }
 
 /** The session-complete step waits while a group real players took over is still out on the course. */
-async function heldBy(sessionId: string): Promise<number | null> {
+async function heldBy(sessionId: string, since: string | undefined): Promise<number | null> {
   const db = await getDb();
   const session = await db.selectFrom("sessions").select(["status", "day_id"]).where("id", "=", sessionId).executeTakeFirst();
   if (!session || session.status !== "live") return null;
-  const humans = await humanGroups(sessionId);
+  const humans = await humanGroups(sessionId, since);
   if (!humans.size) return null;
   const day = await db.selectFrom("days").select("event_id").where("id", "=", session.day_id).executeTakeFirstOrThrow();
   const s = (await loadTour(day.event_id, null)).sessions.find((x) => x.session.id === sessionId);
@@ -158,9 +161,9 @@ async function heldBy(sessionId: string): Promise<number | null> {
   return open ? open.match.group_no : null;
 }
 
-async function waitingFor(action: DemoAction | undefined, clock: number): Promise<string | null> {
+async function waitingFor(action: DemoAction | undefined, clock: number, since: string | undefined): Promise<string | null> {
   if (!action || action.kind !== "complete" || action.t > clock) return null;
-  const group = await heldBy(action.session);
+  const group = await heldBy(action.session, since);
   return group ? `Waiting for group ${group} to finish their card` : null;
 }
 
@@ -194,7 +197,7 @@ export async function tickDemo(eventId: string, force = false): Promise<number> 
   while (row && row.cursor < plan.actions.length && plan.actions[row.cursor].t <= clock) {
     const i = row.cursor;
     const due = plan.actions[i];
-    if (due.kind === "complete" && !force && (await heldBy(due.session))) {
+    if (due.kind === "complete" && !force && (await heldBy(due.session, plan.handback))) {
       // hold demo time here until the group is done (Skip forces past it)
       await db.updateTable("demo").set({ clock: due.t, running_since: row.running_since ? nowIso() : null }).where("event_id", "=", eventId).execute();
       break;
@@ -204,7 +207,7 @@ export async function tickDemo(eventId: string, force = false): Promise<number> 
     if (Number(claim.numUpdatedRows) === 1) {
       const action = plan.actions[i];
       // one bad step (e.g. the organizer edited the draw mid-demo) shouldn't stall the rest
-      await apply(action, plan.seed, getTour).catch((e) => console.error("demo step failed", action.kind, e));
+      await apply(action, plan, getTour).catch((e) => console.error("demo step failed", action.kind, e));
       if (action.kind === "submit" || action.kind === "publish") tour = null;
       applied++;
     }
@@ -213,7 +216,8 @@ export async function tickDemo(eventId: string, force = false): Promise<number> 
   return applied;
 }
 
-async function apply(a: DemoAction, seed: number, getTour: () => Promise<Tour>) {
+async function apply(a: DemoAction, plan: DemoPlan, getTour: () => Promise<Tour>) {
+  const seed = plan.seed;
   const db = await getDb();
   const ts = nowIso();
   switch (a.kind) {
@@ -247,7 +251,7 @@ async function apply(a: DemoAction, seed: number, getTour: () => Promise<Tour>) 
       const tour = await getTour();
       const s = tour.sessions.find((x) => x.session.id === a.session);
       if (!s || s.session.status === "complete") return;
-      if ((await humanGroups(a.session)).has(a.group)) return; // real players are keeping this card
+      if ((await humanGroups(a.session, plan.handback)).has(a.group)) return; // real players are keeping this card
       const group = s.matches.filter((x) => x.match.group_no === a.group);
       const members = group.flatMap((x) => [...x.sideA, ...x.sideB].flatMap((e) => e.players.map((p) => p.id)));
       const scorer = group[0]?.match.scorer_id ?? members[0];

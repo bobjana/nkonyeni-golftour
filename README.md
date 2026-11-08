@@ -49,6 +49,7 @@ Teams: Medics and Business-Elites, 4 placeholder players each; the first player 
 
 **Organize → Demo** plays the whole tour on a fast clock (about 26 minutes at 1×, 6½ at 4×): pairings open, captains submit, the draw goes live, each group's scorer enters hole by hole, the hidden holes go dark and every day ends in the Grand Reveal. Anyone signed in sees it on their own phone; a gold strip at the top shows a demo is on. Pause, change speed, or **Skip to next** jumps to the next highlight (draw, hidden holes, last putt, reveal).
 
+- **Enter scores yourself:** press Pause, open any group from **Enter scores yourself** on the Demo tab (or sign in as a player in that group) and save holes. Press Resume and the simulator carries on from the next hole nobody has entered. If you save while it runs, it leaves that group to you until you next press Resume.
 - Starting a demo wipes the event's pairings, scores and reveals. Players, teams and courses stay.
 - There's no background worker: open phones advance the demo every 3 s, so it pauses while nobody has the app open and catches up when someone returns.
 - Set `DEMO_DISABLED=1` on the real tour days to hide the Demo tab so nobody wipes live scores.

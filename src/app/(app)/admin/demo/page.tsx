@@ -1,8 +1,10 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Button, Card, Field, Flash, inputCls, Pill } from "@/components/ui";
 import { currentTour } from "@/lib/current";
 import { demoEnabled, demoStatus, SPEEDS } from "@/lib/demo";
 import { playersOf } from "@/lib/tour";
+import { sessionTitle } from "@/lib/view";
 import { pause, resume, skip, speed, start, stop } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -17,6 +19,16 @@ export default async function DemoPage({ searchParams }: { searchParams: Promise
   const demo = await demoStatus(tour.event.id);
   const active = demo && !demo.finished;
   const captains = new Set(tour.teams.map((t) => t.captain_id));
+  // Every group on course right now, for entering scores by hand.
+  const groups = tour.sessions
+    .filter((s) => s.session.status === "live")
+    .flatMap((s) =>
+      [...new Set(s.matches.map((m) => m.match.group_no))].map((g) => {
+        const ms = s.matches.filter((m) => m.match.group_no === g);
+        const next = s.played.find((h) => ms.some((m) => !m.holes.find((c) => c.number === h.number)?.result));
+        return { s, g, names: ms.flatMap(playersOf).map((p) => p.name.split(" ")[0]).join(", "), next: next?.number };
+      }),
+    );
   const onCourse = new Set(tour.sessions.flatMap((s) => (s.session.status === "live" ? s.matches.flatMap((m) => playersOf(m).map((p) => p.id)) : [])));
 
   return (
@@ -102,6 +114,32 @@ export default async function DemoPage({ searchParams }: { searchParams: Promise
             </label>
             <Button variant="gold" type="submit">{demo?.finished ? "Start again" : "Start demo"}</Button>
           </form>
+        </Card>
+      )}
+
+      {active && groups.length > 0 && (
+        <Card>
+          <span className="text-sm font-bold">Enter scores yourself</span>
+          <p className="text-xs text-muted">
+            {demo.running ? (
+              <>Pause first so the simulator doesn&apos;t race you. If you save while it runs, it leaves that group to you until you press Resume.</>
+            ) : (
+              <>Open a group&apos;s card, enter or change any holes, then press <b>Resume</b>. The simulator carries on from the next hole nobody has entered.</>
+            )}
+          </p>
+          {groups.map(({ s, g, names, next }) => (
+            <Link
+              key={`${s.session.id}-${g}`}
+              href={`/score/${s.session.id}?group=${g}`}
+              className="flex items-center justify-between gap-3 rounded-xl border border-[#d8dce3] px-3 py-2.5"
+            >
+              <span className="flex min-w-0 flex-col">
+                <span className="text-sm font-semibold">{groups.some((x) => x.s !== s) ? `${sessionTitle(s)} · ` : ""}Group {g}</span>
+                <span className="truncate text-xs text-muted">{names}</span>
+              </span>
+              <span className="shrink-0 text-sm font-bold text-[#1d5bbf]">{next ? `Hole ${next} →` : "Card done →"}</span>
+            </Link>
+          ))}
         </Card>
       )}
 

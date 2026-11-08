@@ -24,6 +24,8 @@ export type DemoAction = DemoStep & {
 export interface DemoPlan {
   seed: number;
   actions: DemoAction[];
+  /** last Resume: groups people scored before it go back to the simulator */
+  handback?: string;
 }
 
 export interface PlanInput {
