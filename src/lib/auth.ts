@@ -2,6 +2,7 @@ import "server-only";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { cache } from "react";
 import { getDb } from "./db";
 import type { PlayerRow } from "./db/types";
 
@@ -33,7 +34,8 @@ export async function endSession() {
   (await cookies()).delete(COOKIE);
 }
 
-export async function getViewer(): Promise<PlayerRow | null> {
+/** The signed-in player, looked up once per request (layout and page share the result). */
+export const getViewer = cache(async (): Promise<PlayerRow | null> => {
   const raw = (await cookies()).get(COOKIE)?.value;
   if (!raw) return null;
   const dot = raw.lastIndexOf(".");
@@ -43,7 +45,7 @@ export async function getViewer(): Promise<PlayerRow | null> {
   if (sig.length !== expected.length || !timingSafeEqual(sig, expected)) return null;
   const db = await getDb();
   return (await db.selectFrom("players").selectAll().where("id", "=", id).executeTakeFirst()) ?? null;
-}
+});
 
 export async function requireViewer(): Promise<PlayerRow> {
   const v = await getViewer();

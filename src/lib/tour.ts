@@ -110,27 +110,37 @@ const first = (p: PlayerRow) => p.name.trim().split(/\s+/)[0];
 
 export async function loadTour(eventId: string, viewer: PlayerRow | null): Promise<Tour> {
   const db = await getDb();
-  const event = await db.selectFrom("events").selectAll().where("id", "=", eventId).executeTakeFirstOrThrow();
-  const teamRows = await db.selectFrom("teams").selectAll().where("event_id", "=", eventId).orderBy("sort").execute();
+
+  // Independent reads run together: each round trip to a remote Postgres costs ~150ms.
+  const [event, teamRows, players, courseRows, days] = await Promise.all([
+    db.selectFrom("events").selectAll().where("id", "=", eventId).executeTakeFirstOrThrow(),
+    db.selectFrom("teams").selectAll().where("event_id", "=", eventId).orderBy("sort").execute(),
+    db.selectFrom("players").selectAll().where("event_id", "=", eventId).orderBy("name").execute(),
+    db.selectFrom("courses").selectAll().where("event_id", "=", eventId).execute(),
+    db.selectFrom("days").selectAll().where("event_id", "=", eventId).orderBy("number").execute(),
+  ]);
   if (teamRows.length < 2) throw new Error("An event needs two teams");
   const teams = [teamRows[0], teamRows[1]] as [TeamRow, TeamRow];
-  const players = await db.selectFrom("players").selectAll().where("event_id", "=", eventId).orderBy("name").execute();
-  const courseRows = await db.selectFrom("courses").selectAll().where("event_id", "=", eventId).execute();
+
   const courseIds = courseRows.map((c) => c.id);
-  const tees = courseIds.length ? await db.selectFrom("tees").selectAll().where("course_id", "in", courseIds).execute() : [];
-  const holeRows = courseIds.length
-    ? await db.selectFrom("holes").selectAll().where("course_id", "in", courseIds).orderBy("number").execute()
-    : [];
-  const days = await db.selectFrom("days").selectAll().where("event_id", "=", eventId).orderBy("number").execute();
   const dayIds = days.map((d) => d.id);
-  const sessions = dayIds.length ? await db.selectFrom("sessions").selectAll().where("day_id", "in", dayIds).execute() : [];
+  const [tees, holeRows, sessions] = await Promise.all([
+    courseIds.length ? db.selectFrom("tees").selectAll().where("course_id", "in", courseIds).execute() : [],
+    courseIds.length
+      ? db.selectFrom("holes").selectAll().where("course_id", "in", courseIds).orderBy("number").execute()
+      : [],
+    dayIds.length ? db.selectFrom("sessions").selectAll().where("day_id", "in", dayIds).execute() : [],
+  ]);
+
   const sessionIds = sessions.map((s) => s.id);
-  const pairings = sessionIds.length
-    ? await db.selectFrom("pairings").selectAll().where("session_id", "in", sessionIds).orderBy("slot").execute()
-    : [];
-  const matches = sessionIds.length
-    ? await db.selectFrom("matches").selectAll().where("session_id", "in", sessionIds).orderBy("match_no").execute()
-    : [];
+  const [pairings, matches] = await Promise.all([
+    sessionIds.length
+      ? db.selectFrom("pairings").selectAll().where("session_id", "in", sessionIds).orderBy("slot").execute()
+      : [],
+    sessionIds.length
+      ? db.selectFrom("matches").selectAll().where("session_id", "in", sessionIds).orderBy("match_no").execute()
+      : [],
+  ]);
   const matchIds = matches.map((m) => m.id);
   const scores = matchIds.length ? await db.selectFrom("scores").selectAll().where("match_id", "in", matchIds).execute() : [];
 

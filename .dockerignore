@@ -4,4 +4,5 @@ data
 .git
 .env*
 !.env.example
+deploy.env
 *.log
