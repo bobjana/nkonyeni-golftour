@@ -1,0 +1,17 @@
+# ─── Nkonyeni Golf Tour — gcloud ignore ──────────────────────────────────────
+# Files and patterns excluded from source uploads to Cloud Build / Cloud Run.
+
+.git
+.gitignore
+node_modules
+.next
+out
+data
+public/images/**/generated   # if any
+.env
+.env.local
+.env.production
+deploy.env
+*.log
+*.tsbuildinfo
+.DS_Store
