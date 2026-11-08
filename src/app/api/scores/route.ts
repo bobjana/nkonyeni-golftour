@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getViewer } from "@/lib/auth";
 import { newId } from "@/lib/crypto";
 import { getDb } from "@/lib/db";
-import { loadTour } from "@/lib/tour";
+import { groupMatches, loadTour } from "@/lib/tour";
 
 type Entry = { matchId: string; entityId: string; hole: number; strokes: number; at: string };
 
@@ -26,9 +26,10 @@ export async function POST(req: Request) {
     const found = matchIndex.get(e.matchId);
     if (!found) continue;
     const { s, m } = found;
-    const groupScorer = s.matches.some((x) => x.match.group_no === m.match.group_no && x.match.scorer_id === viewer.id);
-    if (!viewer.is_organizer && (!groupScorer || s.session.status !== "live")) {
-      return NextResponse.json({ error: "You're not the scorer for this match." }, { status: 403 });
+    // Anyone in the group may keep the card; differing entries are flagged for the organizer.
+    const inGroup = groupMatches(s, viewer.id).some((x) => x.match.id === m.match.id);
+    if (!viewer.is_organizer && (!inGroup || s.session.status !== "live")) {
+      return NextResponse.json({ error: "You're not in this match's group." }, { status: 403 });
     }
     const valid =
       [...m.sideA, ...m.sideB].some((x) => x.id === e.entityId) &&

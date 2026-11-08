@@ -6,7 +6,7 @@ import { Notices } from "@/components/Notices";
 import { Scoreboard } from "@/components/Scoreboard";
 import { currentTour } from "@/lib/current";
 import { fmtPts } from "@/lib/scoring";
-import { scorerMatches } from "@/lib/tour";
+import { groupMatches } from "@/lib/tour";
 import { sessionTitle, toWin } from "@/lib/view";
 
 export const dynamic = "force-dynamic";
@@ -30,7 +30,7 @@ export default async function LivePage() {
   }
 
   const scoring = lives
-    .map((s) => ({ s, mine: scorerMatches(s, tour.viewer!.id) }))
+    .map((s) => ({ s, mine: groupMatches(s, tour.viewer!.id) }))
     .find(({ mine }) => mine.some((m) => m.completed < m.holes.length));
   const nextHole = scoring?.s.played.find((h) => scoring.mine.some((m) => !m.holes.find((c) => c.number === h.number)?.result))?.number;
 

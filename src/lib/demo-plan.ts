@@ -7,7 +7,8 @@ export type DemoStep =
   | { kind: "open"; session: string }
   | { kind: "submit"; session: string; team: number; slots: string[][] }
   | { kind: "publish"; session: string; scorers: string[] }
-  | { kind: "hole"; session: string; group: number; hole: number }
+  /** dispute: another group member also enters this hole, one stroke different, so the day has a score check */
+  | { kind: "hole"; session: string; group: number; hole: number; dispute?: boolean }
   | { kind: "complete"; session: string }
   | { kind: "reveal"; day: string }
   | { kind: "end" };
@@ -82,7 +83,7 @@ export function buildPlan(input: PlanInput): DemoPlan {
   let t = 0;
 
   for (const day of input.days) {
-    for (const s of day.sessions) {
+    for (const [si, s] of day.sessions.entries()) {
       const name = `Day ${day.number} ${s.slot} ${FORMAT_LABEL[s.format].toLowerCase()}`;
       const singles = s.format === "singles";
       const slotsFor = (team: PlanInput["teams"][number]) => {
@@ -120,13 +121,15 @@ export function buildPlan(input: PlanInput): DemoPlan {
         s.played.forEach((hole, i) => {
           const at = start + i * PACE.hole;
           const hidden = s.hidden[0] === hole && g === 1;
+          const dispute = si === 0 && g === groups && i === 3;
           actions.push({
             t: at,
             kind: "hole",
             session: s.id,
             group: g,
             hole,
-            text: `Group ${g} enters hole ${hole}`,
+            ...(dispute ? { dispute } : {}),
+            text: dispute ? `Group ${g} finishes hole ${hole} (two phones disagree)` : `Group ${g} finishes hole ${hole}`,
             ...(hidden ? { moment: `Hidden holes begin · ${name}` } : {}),
           });
           end = Math.max(end, at);

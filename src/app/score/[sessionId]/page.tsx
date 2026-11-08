@@ -1,8 +1,9 @@
 import { notFound, redirect } from "next/navigation";
 import { DemoTicker } from "@/components/DemoTicker";
 import { currentTour } from "@/lib/current";
+import { getDb } from "@/lib/db";
 import { demoStatus } from "@/lib/demo";
-import { scorerMatches } from "@/lib/tour";
+import { groupMatches } from "@/lib/tour";
 import { sessionTitle } from "@/lib/view";
 import { ScoreCard, type CardMatch } from "./ScoreCard";
 
@@ -16,7 +17,7 @@ export default async function ScorePage({ params, searchParams }: { params: Prom
   const s = tour.sessions.find((x) => x.session.id === sessionId);
   if (!s) notFound();
 
-  let mine = scorerMatches(s, me.id);
+  let mine = groupMatches(s, me.id);
   if (me.is_organizer && group) mine = s.matches.filter((m) => m.match.group_no === Number(group));
   if (!mine.length) redirect("/live");
   if (s.session.status !== "live" && !me.is_organizer) redirect("/live");
@@ -51,6 +52,15 @@ export default async function ScorePage({ params, searchParams }: { params: Prom
     };
   });
 
+  // Who last saved each hole, so the group can see a hole is already in.
+  const db = await getDb();
+  const saves = await db.selectFrom("scores").select(["hole", "updated_by", "updated_at"]).where("match_id", "in", mine.map((m) => m.match.id)).execute();
+  const lastSave: Record<number, { by: string; at: string }> = {};
+  for (const r of saves) if (!lastSave[r.hole] || lastSave[r.hole].at < r.updated_at) lastSave[r.hole] = { by: r.updated_by, at: r.updated_at };
+  const savedBy = Object.fromEntries(
+    Object.entries(lastSave).map(([h, x]) => [h, x.by === me.id ? "you" : (tour.playerById.get(x.by)?.name.split(" ")[0] ?? "the organizer")]),
+  );
+
   const demo = await demoStatus(tour.event.id);
   return (
     <>
@@ -64,6 +74,8 @@ export default async function ScorePage({ params, searchParams }: { params: Prom
         hidden={day.day.revealed_at ? [] : s.hidden}
         teams={tour.teams.map((t) => ({ name: t.name, color: t.color }))}
         matches={matches}
+        savedBy={savedBy}
+        tally={{ tour: tour.points, session: s.points }}
       />
     </>
   );

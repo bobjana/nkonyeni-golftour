@@ -106,6 +106,15 @@ export const DDL: string[] = [
     at TEXT NOT NULL,
     actor TEXT NOT NULL
   )`,
+  `CREATE TABLE IF NOT EXISTS score_checks (
+    match_id TEXT NOT NULL REFERENCES matches(id),
+    entity_id TEXT NOT NULL,
+    hole INTEGER NOT NULL,
+    strokes INTEGER NOT NULL,
+    resolved_by TEXT NOT NULL,
+    resolved_at TEXT NOT NULL,
+    PRIMARY KEY (match_id, entity_id, hole)
+  )`,
   `CREATE TABLE IF NOT EXISTS demo (
     event_id TEXT PRIMARY KEY REFERENCES events(id),
     plan TEXT NOT NULL,

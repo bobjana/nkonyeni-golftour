@@ -3,13 +3,14 @@ import { LockIcon } from "@/components/icons";
 import { Button, Flash } from "@/components/ui";
 import { currentTour } from "@/lib/current";
 import { fmtPts } from "@/lib/scoring";
+import { dayConflicts } from "@/lib/score-checks";
 import { loadTour } from "@/lib/tour";
 import { dayDate } from "@/lib/view";
-import { setReveal } from "../actions";
+import { resolveScore, setReveal } from "../actions";
 
 export const dynamic = "force-dynamic";
 
-export default async function RevealPage({ searchParams }: { searchParams: Promise<{ day?: string }> }) {
+export default async function RevealPage({ searchParams }: { searchParams: Promise<{ day?: string; saved?: string }> }) {
   const sp = await searchParams;
   const tour = await currentTour();
   // What everyone else sees right now (no organizer privileges).
@@ -22,6 +23,8 @@ export default async function RevealPage({ searchParams }: { searchParams: Promi
   const hiddenPts = hiddenRows.reduce((a, r) => a + r.cells.length, 0);
   const [ta, tb] = tour.teams;
   const revealed = !!day.day.revealed_at;
+  const conflicts = await dayConflicts(tour, day.day.id);
+  const time = (iso: string) => new Date(iso).toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit", timeZone: "Africa/Johannesburg" });
 
   return (
     <div className="-m-3.5 flex flex-col gap-4 bg-navy-deep p-4.5 text-white">
@@ -84,12 +87,53 @@ export default async function RevealPage({ searchParams }: { searchParams: Promi
         ))}
       </section>
 
+      <section className="flex flex-col gap-2.5 rounded-[20px] bg-white p-4 text-navy">
+        <div className="flex items-center justify-between">
+          <span className="text-base font-bold">Score checks</span>
+          <span className={`rounded-full px-2 py-1 text-[11px] font-bold ${conflicts.length ? "bg-[#fcebee] text-[#8e0b20]" : "bg-[#e3f4ea] text-[#17643a]"}`}>
+            {conflicts.length ? `${conflicts.length} to check` : "All cards agree"}
+          </span>
+        </div>
+        {sp.saved === "check" && <p className="text-xs font-semibold text-[#17643a]">Score updated.</p>}
+        {conflicts.length === 0 ? (
+          <p className="text-xs text-muted">Anyone in a group can keep the card. When two phones enter different scores for the same hole, it shows up here so you can settle it before the reveal.</p>
+        ) : (
+          conflicts.map((c) => {
+            const values = [...new Set(c.entries.map((e) => e.strokes))];
+            return (
+              <div key={`${c.match.match.id}|${c.entity.id}|${c.hole}`} className="flex flex-col gap-2 border-t border-[#f0ede6] pt-2.5">
+                <span className="text-sm font-bold">{c.session.session.slot} · Match {c.match.match.match_no} · Hole {c.hole}{c.match.holes.find((h) => h.number === c.hole)?.hiddenHole ? " (hidden)" : ""}</span>
+                <span className="text-xs text-muted">Score for {c.entity.label}</span>
+                <div className="flex flex-col gap-0.5">
+                  {c.entries.map((e, i) => (
+                    <span key={i} className="text-[13px]">
+                      <b>{e.name}</b> entered <b>{e.strokes === 0 ? "pick-up" : e.strokes}</b> <span className="text-muted">at {time(e.at)}</span>
+                    </span>
+                  ))}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {values.map((v) => (
+                    <form key={v} action={resolveScore.bind(null, c.match.match.id, c.entity.id, c.hole, day.day.id, v)}>
+                      <button className={`h-10 rounded-[10px] px-3.5 text-sm font-bold ${v === c.counting ? "bg-navy text-white" : "border border-[#d8dce3] bg-white text-navy"}`}>
+                        {v === 0 ? "Pick-up" : v}{v === c.counting ? " · counting now" : ""}
+                      </button>
+                    </form>
+                  ))}
+                </div>
+              </div>
+            );
+          })
+        )}
+        {conflicts.length > 0 && <p className="text-xs text-muted">Tap the right score to settle each one. The live tally uses the score marked &ldquo;counting now&rdquo; until you do.</p>}
+      </section>
+
       {revealed ? (
         <form action={setReveal.bind(null, day.day.id, false)} className="flex flex-col gap-2">
           <Button type="submit" variant="ghost" className="!border-white/25 !bg-transparent !text-white">Hide again</Button>
         </form>
       ) : (
         <form action={setReveal.bind(null, day.day.id, true)} className="flex flex-col gap-2.5">
+          {conflicts.length > 0 && <p className="text-center text-xs font-semibold text-[#ffb3bf]">{conflicts.length} score check{conflicts.length > 1 ? "s" : ""} still open above.</p>}
           <Button type="submit" variant="gold" className="h-15 text-lg shadow-[0_0_0_6px_rgba(201,162,39,0.18)]">Reveal to everyone</Button>
           <p className="text-center text-xs leading-snug text-mist">Every phone plays a drumroll, then shows the day&apos;s result and the new standings.</p>
         </form>

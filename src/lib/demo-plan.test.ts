@@ -59,6 +59,11 @@ describe("demo plan", () => {
     expect(pub?.kind === "publish" && pub.scorers).toHaveLength(2);
   });
 
+  it("plants one disputed hole on each day", () => {
+    const disputes = a.filter((x) => x.kind === "hole" && x.dispute);
+    expect(disputes.map((x) => x.kind === "hole" && x.session)).toEqual(["s1", "s2", "s4"]);
+  });
+
   it("takes about half an hour at 1×", () => {
     expect(a.at(-1)!.t / 60).toBeGreaterThan(20);
     expect(a.at(-1)!.t / 60).toBeLessThan(35);

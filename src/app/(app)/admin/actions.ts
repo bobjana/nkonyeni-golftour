@@ -185,6 +185,26 @@ export async function setReveal(dayId: string, reveal: boolean) {
   done(`/admin/reveal?day=${dayId}`);
 }
 
+/** Settles a hole where group members' cards disagree: the chosen score counts. */
+export async function resolveScore(matchId: string, entityId: string, hole: number, dayId: string, strokes: number) {
+  const { org, db } = await guard();
+  const match = await db.selectFrom("matches").select(["id", "session_id"]).where("id", "=", matchId).executeTakeFirstOrThrow();
+  await ownSession(match.session_id, org.event_id);
+  const at = new Date().toISOString();
+  await db
+    .insertInto("scores")
+    .values({ match_id: matchId, entity_id: entityId, hole, strokes, updated_at: at, updated_by: org.id })
+    .onConflict((oc) => oc.columns(["match_id", "entity_id", "hole"]).doUpdateSet({ strokes, updated_at: at, updated_by: org.id }))
+    .execute();
+  await db
+    .insertInto("score_checks")
+    .values({ match_id: matchId, entity_id: entityId, hole, strokes, resolved_by: org.id, resolved_at: at })
+    .onConflict((oc) => oc.columns(["match_id", "entity_id", "hole"]).doUpdateSet({ strokes, resolved_by: org.id, resolved_at: at }))
+    .execute();
+  await db.insertInto("score_log").values({ id: newId(), match_id: matchId, entity_id: entityId, hole, strokes, at, actor: `ruling:${org.id}` }).execute();
+  done(`/admin/reveal?day=${dayId}&saved=check`);
+}
+
 // ── Teams and players ───────────────────────────────────────────────────────
 
 export async function updateTeam(teamId: string, form: FormData) {

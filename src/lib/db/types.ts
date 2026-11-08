@@ -121,6 +121,16 @@ export interface ScoreLogRow {
   actor: string;
 }
 
+/** The organizer's ruling on a hole where group members entered different scores. */
+export interface ScoreCheckRow {
+  match_id: string;
+  entity_id: string;
+  hole: number;
+  strokes: number;
+  resolved_by: string;
+  resolved_at: string;
+}
+
 /** The in-app demo: a timeline of actions replayed against the event as time passes. */
 export interface DemoRow {
   event_id: string;
@@ -148,5 +158,6 @@ export interface Database {
   matches: MatchRow;
   scores: ScoreRow;
   score_log: ScoreLogRow;
+  score_checks: ScoreCheckRow;
   demo: DemoRow;
 }

@@ -278,3 +278,9 @@ export function scorerMatches(s: SessionView, playerId: string): MatchView[] {
 }
 
 export const playersOf = (m: MatchView) => [...m.sideA, ...m.sideB].flatMap((e) => e.players);
+
+/** The match group this player plays in (or scores for) in a session. Anyone in it may keep the card. */
+export function groupMatches(s: SessionView, playerId: string): MatchView[] {
+  const mine = s.matches.find((m) => m.match.scorer_id === playerId || playersOf(m).some((p) => p.id === playerId));
+  return mine ? s.matches.filter((m) => m.match.group_no === mine.match.group_no) : [];
+}

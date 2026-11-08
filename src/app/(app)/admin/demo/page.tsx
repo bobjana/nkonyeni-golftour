@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { Button, Card, Field, Flash, inputCls, Pill } from "@/components/ui";
 import { currentTour } from "@/lib/current";
 import { demoEnabled, demoStatus, SPEEDS } from "@/lib/demo";
+import { playersOf } from "@/lib/tour";
 import { pause, resume, skip, speed, start, stop } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -16,7 +17,7 @@ export default async function DemoPage({ searchParams }: { searchParams: Promise
   const demo = await demoStatus(tour.event.id);
   const active = demo && !demo.finished;
   const captains = new Set(tour.teams.map((t) => t.captain_id));
-  const scorers = new Set(tour.sessions.flatMap((s) => (s.session.status === "live" ? s.matches.map((m) => m.match.scorer_id) : [])));
+  const onCourse = new Set(tour.sessions.flatMap((s) => (s.session.status === "live" ? s.matches.flatMap((m) => playersOf(m).map((p) => p.id)) : [])));
 
   return (
     <>
@@ -35,6 +36,9 @@ export default async function DemoPage({ searchParams }: { searchParams: Promise
             <span>Step {demo.cursor} of {demo.total}</span>
             <span>About {clock(demo.remaining)} to go</span>
           </div>
+          {demo.waiting && (
+            <p className="rounded-xl bg-gold-soft px-3 py-2.5 text-sm font-semibold text-[#5c4a0e]">{demo.waiting}. Skip to move on without them.</p>
+          )}
           {demo.next && (
             <p className="rounded-xl bg-sand px-3 py-2.5 text-sm">
               <span className="text-muted">Up next: </span>
@@ -103,7 +107,9 @@ export default async function DemoPage({ searchParams }: { searchParams: Promise
 
       <Card>
         <span className="text-sm font-bold">Watch from another phone</span>
-        <p className="text-xs text-muted">Sign in with the event password as any of these. Captains get the pairing screens, scorers land on their card.</p>
+        <p className="text-xs text-muted">
+            Sign in with the event password as any of these. Captains get the pairing screens. Anyone on course can tap <b>Score hole</b> on the Live tab: once you save a hole, the demo stops scoring your group and leaves the card to you.
+          </p>
         {tour.teams.map((t) => (
           <div key={t.id} className="flex flex-col gap-1">
             <span className="text-xs font-bold uppercase" style={{ color: t.color }}>{t.name}</span>
@@ -114,7 +120,7 @@ export default async function DemoPage({ searchParams }: { searchParams: Promise
                   <span className="truncate">{p.name}</span>
                   <span className="flex shrink-0 items-center gap-1.5">
                     {captains.has(p.id) && <Pill tone="gold">Captain</Pill>}
-                    {scorers.has(p.id) && <Pill tone="green">Scoring now</Pill>}
+                    {onCourse.has(p.id) && <Pill tone="green">On course</Pill>}
                     <span className="text-xs text-muted">{p.email}</span>
                   </span>
                 </div>

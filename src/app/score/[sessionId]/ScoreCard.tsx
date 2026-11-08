@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { BackIcon, CheckIcon, LockIcon, OfflineIcon } from "@/components/icons";
 import type { Format } from "@/lib/db/types";
@@ -49,6 +50,8 @@ export function ScoreCard({
   hidden,
   teams,
   matches,
+  savedBy,
+  tally,
 }: {
   sessionId: string;
   title: string;
@@ -58,7 +61,12 @@ export function ScoreCard({
   hidden: number[];
   teams: { name: string; color: string }[];
   matches: CardMatch[];
+  /** first name of whoever last saved each hole ("you" for this player) */
+  savedBy: Record<number, string>;
+  /** what this player can see of the team tally right now */
+  tally: { tour: { a: number; b: number }; session: { a: number; b: number } };
 }) {
+  const router = useRouter();
   const qk = queueKey(sessionId);
   const [scores, setScores] = useState<Scores>(() => Object.fromEntries(matches.map((m) => [m.id, structuredClone(m.scores)])));
   const entitiesOf = (m: CardMatch) => [...m.sideA, ...m.sideB];
@@ -89,6 +97,7 @@ export function ScoreCard({
         writeQueue(qk, left);
         setPending(left.length);
         setError(null);
+        router.refresh();
       } else {
         setError((await res.json().catch(() => ({})))?.error ?? `Sync failed (${res.status})`);
       }
@@ -97,7 +106,7 @@ export function ScoreCard({
     } finally {
       setSyncing(false);
     }
-  }, [qk]);
+  }, [qk, router]);
 
   // Re-apply anything still queued on this phone (newer than what the server sent), then keep syncing.
   useEffect(() => {
@@ -118,7 +127,10 @@ export function ScoreCard({
     const off = () => setOnline(false);
     window.addEventListener("online", on);
     window.addEventListener("offline", off);
-    const t = setInterval(flush, 10000);
+    const t = setInterval(() => {
+      flush();
+      if (document.visibilityState === "visible") router.refresh();
+    }, 15000);
     flush();
     return () => {
       window.removeEventListener("online", on);
@@ -128,22 +140,42 @@ export function ScoreCard({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [flush, qk]);
 
-  // Pick up holes entered elsewhere (another phone, or the demo) when the page refreshes.
+  // True once the player touches a score on the hole on screen; until then
+  // entries from other phones may update it and move the card along.
+  const [dirty, setDirty] = useState(false);
+  const [mine, setMine] = useState<Set<number>>(() => new Set());
+  const [notice, setNotice] = useState<string | null>(null);
+
+  // Pick up what others in the group saved (and the server's view of ours) when the page refreshes.
   useEffect(() => {
+    const queued = new Set(readQueue(qk).map((e) => `${e.matchId}|${e.entityId}|${e.hole}`));
     setScores((prev) => {
       let changed = false;
       const next = structuredClone(prev);
+      const touched = new Set<number>();
       for (const m of matches)
         for (const [entityId, byHole] of Object.entries(m.scores))
           for (const [h, strokes] of Object.entries(byHole)) {
             const row = ((next[m.id] ??= {})[entityId] ??= {});
-            if (row[Number(h)] === undefined) {
-              row[Number(h)] = strokes;
+            const hole = Number(h);
+            if (row[hole] !== strokes && !queued.has(`${m.id}|${entityId}|${hole}`)) {
+              row[hole] = strokes;
               changed = true;
+              touched.add(hole);
             }
           }
       if (!changed) return prev;
-      setIdx((i) => (i < holes.length && holeDone(next, holes[i].number) ? firstOpen(next) : i));
+      if (!dirty) {
+        setIdx((i) => {
+          const current = holes[Math.min(i, holes.length - 1)];
+          if (i < holes.length && touched.has(current.number) && holeDone(next, current.number)) {
+            const by = savedBy[current.number];
+            setNotice(`${by && by !== "you" ? by : "Someone in your group"} saved hole ${current.number}`);
+            return firstOpen(next);
+          }
+          return i;
+        });
+      }
       return next;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -161,9 +193,20 @@ export function ScoreCard({
   const [draft, setDraft] = useState<Record<string, Record<string, number>>>(() => initialDraft(hole, scores));
   useEffect(() => {
     setDraft(initialDraft(hole, scores));
+    setDirty(false);
     // only when the hole changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hole.number]);
+  useEffect(() => {
+    if (!dirty) setDraft(initialDraft(hole, scores));
+    // someone else's save for the hole on screen shows up while untouched
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scores]);
+  useEffect(() => {
+    if (!notice) return;
+    const t = setTimeout(() => setNotice(null), 4000);
+    return () => clearTimeout(t);
+  }, [notice]);
 
   const resultFor = (m: CardMatch, h: number, s: Scores): HoleWinner | null =>
     holeWinner(
@@ -183,21 +226,31 @@ export function ScoreCard({
     [matches, holes, idx, scores],
   );
 
-  const bump = (matchId: string, entityId: string, d: number) =>
+  const bump = (matchId: string, entityId: string, d: number) => {
+    setDirty(true);
     setDraft((p) => {
       const cur = p[matchId][entityId];
       const next = cur === 0 ? (d > 0 ? hole.par : hole.par - 1) : Math.max(1, Math.min(15, cur + d));
       return { ...p, [matchId]: { ...p[matchId], [entityId]: next } };
     });
-  const pickUp = (matchId: string, entityId: string) =>
+  };
+  const pickUp = (matchId: string, entityId: string) => {
+    setDirty(true);
     setDraft((p) => ({ ...p, [matchId]: { ...p[matchId], [entityId]: p[matchId][entityId] === 0 ? hole.par : 0 } }));
+  };
 
   const save = () => {
+    // already saved and untouched: just move on, so nobody re-enters a hole by accident
+    if (holeDone(scores, hole.number) && !dirty) {
+      setIdx(idx < holes.length - 1 ? idx + 1 : holes.length);
+      return;
+    }
     const at = new Date().toISOString();
     const entries: Entry[] = matches.flatMap((m) => entitiesOf(m).map((e) => ({ matchId: m.id, entityId: e.id, hole: hole.number, strokes: draft[m.id][e.id], at })));
     const next = structuredClone(scores);
     for (const e of entries) ((next[e.matchId] ??= {})[e.entityId] ??= {})[e.hole] = e.strokes;
     setScores(next);
+    setMine((p) => new Set(p).add(hole.number));
     writeQueue(qk, [...readQueue(qk), ...entries]);
     setPending(readQueue(qk).length);
     flush();
@@ -218,6 +271,22 @@ export function ScoreCard({
   return (
     <div className="flex min-h-dvh flex-col">
       <header className="sticky top-0 z-10 flex flex-col gap-3 bg-navy px-4 pt-3 pb-3.5 text-white">
+        <div className="-mx-4 -mt-3 grid grid-cols-[1fr_auto_1fr] items-center gap-2 bg-navy-deep px-4 py-2">
+          <span className="flex items-baseline gap-1.5 truncate">
+            <span className="h-2 w-2 flex-none self-center rounded-full" style={{ background: teams[0].color }} />
+            <span className="truncate text-[11px] font-semibold text-mist uppercase">{teams[0].name}</span>
+            <span className="font-display text-xl font-bold">{fmtPts(tally.tour.a)}</span>
+          </span>
+          <span className="flex flex-col items-center leading-tight">
+            <span className="text-[10px] font-bold tracking-wider text-gold">TOUR</span>
+            <span className="text-[10px] text-mist">today {fmtPts(tally.session.a)}–{fmtPts(tally.session.b)}</span>
+          </span>
+          <span className="flex items-baseline justify-end gap-1.5 truncate">
+            <span className="font-display text-xl font-bold">{fmtPts(tally.tour.b)}</span>
+            <span className="truncate text-[11px] font-semibold text-mist uppercase">{teams[1].name}</span>
+            <span className="h-2 w-2 flex-none self-center rounded-full" style={{ background: teams[1].color }} />
+          </span>
+        </div>
         <div className="flex items-center justify-between gap-2">
           <Link href="/live" className="flex items-center gap-1 text-[13px] font-semibold">
             <BackIcon size={16} />
@@ -231,6 +300,14 @@ export function ScoreCard({
             <div className="flex flex-col gap-0.5">
               <span className="text-xs font-bold tracking-wider text-gold">HOLE</span>
               <span className="font-display text-6xl leading-[0.9] font-bold">{hole.number}</span>
+              {holeDone(scores, hole.number) ? (
+                <span className="mt-1 flex items-center gap-1 text-[11px] font-semibold text-[#9ee6bd]">
+                  <CheckIcon size={12} />
+                  Saved by {mine.has(hole.number) ? "you" : (savedBy[hole.number] ?? "your group")}
+                </span>
+              ) : (
+                <span className="mt-1 text-[11px] font-semibold text-[#ffd27a]">Not saved yet</span>
+              )}
             </div>
             <div className="grid grid-cols-3 gap-x-4 gap-y-1 text-center">
               <span className="text-[11px] text-mist">PAR</span>
@@ -288,6 +365,12 @@ export function ScoreCard({
               <span><b>Hidden hole.</b> Only your group can see this result until the Grand Reveal.</span>
             </div>
           )}
+          {notice && <p role="status" className="rounded-lg bg-[#e3f4ea] px-3 py-2 text-sm font-semibold text-[#17643a]">{notice}</p>}
+          {!Object.values(scores).some((byEntity) => Object.keys(byEntity).length) && (
+            <p className="rounded-lg bg-white px-3 py-2.5 text-[13px] leading-snug text-[#3a4352]">
+              Set each player&apos;s strokes with <b>−</b> and <b>+</b> (they start at par), then tap <b>Save hole</b>. Anyone in your group can keep the card; if two phones disagree the organizer sorts it out at the end of the day.
+            </p>
+          )}
           {error && <p role="alert" className="rounded-lg bg-[#fcebee] px-3 py-2 text-sm text-[#8e0b20]">{error}</p>}
 
           {matches.map((m) => {
@@ -302,7 +385,7 @@ export function ScoreCard({
             const after = { a: t.a + (r === "A" ? 1 : r === "H" ? 0.5 : 0), b: t.b + (r === "B" ? 1 : r === "H" ? 0.5 : 0) };
             const multi = m.sideA.length > 1;
             const counted = (side: CardEntity[], best: number | null) =>
-              (e: CardEntity) => multi && best !== null && best !== Infinity && d[e.id] !== 0 && d[e.id] - (e.received[hole.number] ?? 0) === best;
+              (e: CardEntity) => multi && (dirty || holeDone(scores, hole.number)) && best !== null && best !== Infinity && d[e.id] !== 0 && d[e.id] - (e.received[hole.number] ?? 0) === best;
             return (
               <section key={m.id} className="flex flex-col gap-2">
                 <div className="flex items-center justify-between rounded-xl bg-white px-3.5 py-2.5 text-[13px]">
@@ -361,7 +444,9 @@ export function ScoreCard({
             <BackIcon size={20} />
           </button>
           <button type="button" onClick={save} className="h-14 rounded-2xl bg-gold text-base font-bold text-navy active:opacity-90">
-            Save hole {hole.number}{idx < holes.length - 1 ? " · Next" : " · Finish"}
+            {holeDone(scores, hole.number) && !dirty
+              ? idx < holes.length - 1 ? `Next: hole ${holes[idx + 1].number}` : "Finish"
+              : `${holeDone(scores, hole.number) ? "Update" : "Save"} hole ${hole.number}${idx < holes.length - 1 ? " · Next" : " · Finish"}`}
           </button>
         </div>
       )}

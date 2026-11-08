@@ -24,6 +24,8 @@ export interface DemoStatus {
   /** recent activity, newest first */
   recent: string[];
   next: { moment: string; inSeconds: number } | null;
+  /** set while the demo waits for a group that real players took over */
+  waiting: string | null;
   /** real seconds until the demo ends at the current speed */
   remaining: number;
 }
@@ -55,6 +57,7 @@ export async function demoStatus(eventId: string): Promise<DemoStatus | null> {
     total: plan.actions.length,
     recent: plan.actions.slice(Math.max(0, row.cursor - 6), row.cursor).reverse().map((a) => a.text),
     next: next ? { moment: next.moment!, inSeconds: Math.max(0, Math.round((next.t - clock) / row.speed)) } : null,
+    waiting: await waitingFor(plan.actions[row.cursor], clock),
     remaining: Math.max(0, Math.round((last.t - clock) / row.speed)),
   };
 }
@@ -122,6 +125,45 @@ export const pauseDemo = (eventId: string) => retime(eventId, () => ({ running_s
 export const resumeDemo = (eventId: string) => retime(eventId, () => ({ running_since: nowIso() }));
 export const setDemoSpeed = (eventId: string, speed: number) => retime(eventId, () => ({ speed: SPEEDS.includes(speed) ? speed : 1 }));
 
+/**
+ * Groups where a real player has saved a score: the simulated scorer leaves
+ * those to them for the rest of the session.
+ */
+async function humanGroups(sessionId: string): Promise<Set<number>> {
+  const db = await getDb();
+  const matches = await db.selectFrom("matches").select(["id", "group_no"]).where("session_id", "=", sessionId).execute();
+  if (!matches.length) return new Set();
+  const rows = await db
+    .selectFrom("score_log")
+    .select("match_id")
+    .distinct()
+    .where("match_id", "in", matches.map((m) => m.id))
+    .where("actor", "not like", "demo:%")
+    .where("actor", "not like", "ruling:%")
+    .execute();
+  const ids = new Set(rows.map((r) => r.match_id));
+  return new Set(matches.filter((m) => ids.has(m.id)).map((m) => m.group_no));
+}
+
+/** The session-complete step waits while a group real players took over is still out on the course. */
+async function heldBy(sessionId: string): Promise<number | null> {
+  const db = await getDb();
+  const session = await db.selectFrom("sessions").select(["status", "day_id"]).where("id", "=", sessionId).executeTakeFirst();
+  if (!session || session.status !== "live") return null;
+  const humans = await humanGroups(sessionId);
+  if (!humans.size) return null;
+  const day = await db.selectFrom("days").select("event_id").where("id", "=", session.day_id).executeTakeFirstOrThrow();
+  const s = (await loadTour(day.event_id, null)).sessions.find((x) => x.session.id === sessionId);
+  const open = s?.matches.find((m) => humans.has(m.match.group_no) && m.completed < m.holes.length);
+  return open ? open.match.group_no : null;
+}
+
+async function waitingFor(action: DemoAction | undefined, clock: number): Promise<string | null> {
+  if (!action || action.kind !== "complete" || action.t > clock) return null;
+  const group = await heldBy(action.session);
+  return group ? `Waiting for group ${group} to finish their card` : null;
+}
+
 /** Jumps the clock to the next highlighted moment and plays everything up to it. */
 export async function skipDemo(eventId: string) {
   await retime(eventId, (row, clock) => {
@@ -129,7 +171,7 @@ export async function skipDemo(eventId: string) {
     const next = plan.actions.slice(row.cursor).find((a) => a.moment);
     return { clock: next ? Math.max(clock, next.t) : clock };
   });
-  return tickDemo(eventId);
+  return tickDemo(eventId, true);
 }
 
 export async function stopDemo(eventId: string) {
@@ -138,7 +180,7 @@ export async function stopDemo(eventId: string) {
 }
 
 /** Applies every due step. Returns how many this call applied. */
-export async function tickDemo(eventId: string): Promise<number> {
+export async function tickDemo(eventId: string, force = false): Promise<number> {
   if (!demoEnabled()) return 0;
   const db = await getDb();
   let row = await getRow(eventId);
@@ -151,6 +193,13 @@ export async function tickDemo(eventId: string): Promise<number> {
 
   while (row && row.cursor < plan.actions.length && plan.actions[row.cursor].t <= clock) {
     const i = row.cursor;
+    const due = plan.actions[i];
+    if (due.kind === "complete" && !force && (await heldBy(due.session))) {
+      // hold demo time here until the group is done (Skip forces past it)
+      await db.updateTable("demo").set({ clock: due.t, running_since: row.running_since ? nowIso() : null }).where("event_id", "=", eventId).execute();
+      break;
+    }
+    force = false;
     const claim = await db.updateTable("demo").set({ cursor: i + 1 }).where("event_id", "=", eventId).where("cursor", "=", i).executeTakeFirst();
     if (Number(claim.numUpdatedRows) === 1) {
       const action = plan.actions[i];
@@ -198,7 +247,12 @@ async function apply(a: DemoAction, seed: number, getTour: () => Promise<Tour>) 
       const tour = await getTour();
       const s = tour.sessions.find((x) => x.session.id === a.session);
       if (!s || s.session.status === "complete") return;
-      for (const m of s.matches.filter((x) => x.match.group_no === a.group)) {
+      if ((await humanGroups(a.session)).has(a.group)) return; // real players are keeping this card
+      const group = s.matches.filter((x) => x.match.group_no === a.group);
+      const members = group.flatMap((x) => [...x.sideA, ...x.sideB].flatMap((e) => e.players.map((p) => p.id)));
+      const scorer = group[0]?.match.scorer_id ?? members[0];
+      const other = members.find((id) => id !== scorer);
+      for (const m of group) {
         const cell = m.holes.find((h) => h.number === a.hole);
         if (!cell) continue;
         const existing = new Set(
@@ -219,10 +273,14 @@ async function apply(a: DemoAction, seed: number, getTour: () => Promise<Tour>) 
             if (existing.has(e.id)) continue; // a real scorer got there first
             await db
               .insertInto("scores")
-              .values({ match_id: m.match.id, entity_id: e.id, hole: a.hole, strokes: strokes[j], updated_at: ts, updated_by: "demo" })
+              .values({ match_id: m.match.id, entity_id: e.id, hole: a.hole, strokes: strokes[j], updated_at: ts, updated_by: scorer })
               .onConflict((oc) => oc.columns(["match_id", "entity_id", "hole"]).doNothing())
               .execute();
-            await db.insertInto("score_log").values({ id: newId(), match_id: m.match.id, entity_id: e.id, hole: a.hole, strokes: strokes[j], at: ts, actor: "demo" }).execute();
+            await db.insertInto("score_log").values({ id: newId(), match_id: m.match.id, entity_id: e.id, hole: a.hole, strokes: strokes[j], at: ts, actor: `demo:${scorer}` }).execute();
+            // a second phone in the group remembers this one differently
+            if (a.dispute && other && m === group[0] && side === sides[0] && j === 0) {
+              await db.insertInto("score_log").values({ id: newId(), match_id: m.match.id, entity_id: e.id, hole: a.hole, strokes: strokes[j] + 1, at: ts, actor: `demo:${other}` }).execute();
+            }
           }
         }
       }
