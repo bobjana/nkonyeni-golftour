@@ -1,4 +1,4 @@
-# Cloud Run image: Next.js standalone server talking to Neon Postgres.
+# Cloud Run image: Next.js standalone server talking to Cloud SQL Postgres over the /cloudsql socket.
 FROM node:24-slim AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./

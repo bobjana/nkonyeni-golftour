@@ -8,7 +8,7 @@ export default async function LoginPage() {
   return (
     <Splash subtitle="Ryder Cup–style live scoring">
       <LoginForm />
-      <p className="mt-auto text-center text-[13px] text-mist">No invite yet? Ask your organizer to add you.</p>
+      <p className="mt-auto text-center text-[13px] text-mist">Players: use your personal invite link from the organizer.</p>
     </Splash>
   );
 }

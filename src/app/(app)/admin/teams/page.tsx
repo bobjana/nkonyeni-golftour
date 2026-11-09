@@ -1,9 +1,8 @@
-import { MailIcon } from "@/components/icons";
 import { Button, Card, Field, Flash, inputCls, Pill } from "@/components/ui";
 import { currentTour } from "@/lib/current";
 import type { PlayerRow, TeamRow } from "@/lib/db/types";
 import { appUrl } from "@/lib/email";
-import { invite, removePlayer, savePlayer, updateTeam } from "../actions";
+import { removePlayer, savePlayer, updateTeam } from "../actions";
 
 export const dynamic = "force-dynamic";
 
@@ -18,8 +17,6 @@ export default async function AdminTeamsPage({ searchParams }: { searchParams: P
   const tour = await currentTour();
   const base = await appUrl();
   const tees = tour.courses[0]?.tees ?? [];
-  const pending = tour.players.filter((p) => !p.invited_at).length;
-  const emailOn = !!process.env.RESEND_API_KEY;
 
   const PlayerForm = ({ team, p }: { team: TeamRow; p?: PlayerRow }) => (
     <form action={savePlayer.bind(null, team.id, p?.id ?? null)} className="grid grid-cols-2 gap-2.5">
@@ -50,12 +47,6 @@ export default async function AdminTeamsPage({ searchParams }: { searchParams: P
     <>
       {sp.saved && <Flash>Saved.</Flash>}
       {sp.error && <Flash tone="red">{ERRORS[sp.error] ?? "Something went wrong."}</Flash>}
-      {sp.total && (
-        <Flash tone={sp.failed !== "0" ? "red" : "green"}>
-          {emailOn ? `${sp.invited} of ${sp.total} invites emailed.` : "Email isn't configured (RESEND_API_KEY), so copy the invite links below."}
-          {sp.failed !== "0" && ` ${sp.failed} failed; check the server logs.`}
-        </Flash>
-      )}
 
       {tour.teams.map((team) => {
         const roster = tour.players.filter((p) => p.team_id === team.id);
@@ -75,19 +66,36 @@ export default async function AdminTeamsPage({ searchParams }: { searchParams: P
                     </span>
                   </span>
                   <span className="text-right text-[13px] font-bold">HI {p.handicap_index.toFixed(1)}</span>
-                  {p.joined_at ? <Pill tone="green">Joined</Pill> : p.invited_at ? <Pill tone="gold">Invited</Pill> : <Pill tone="grey">Not sent</Pill>}
+                  {p.joined_at ? <Pill tone="green">Joined</Pill> : <Pill tone="grey">Not joined</Pill>}
                 </summary>
                 <div className="flex flex-col gap-3 pt-3">
                   <PlayerForm team={team} p={p} />
-                  <Field label="Invite link">
-                    <input readOnly value={`${base}/join/${p.invite_token}`} className={`${inputCls} text-xs`} />
+                  <Field label="Invite link — copy and send on WhatsApp">
+                    <div className="flex items-center gap-2">
+                      <input
+                        readOnly
+                        value={`${base}/join/${p.invite_token}`}
+                        className={`${inputCls} flex-1 cursor-pointer select-all text-[13px] font-mono`}
+                        onClick={(e: { currentTarget: HTMLInputElement }) => e.currentTarget.select()}
+                      />
+                      <button
+                        type="button"
+                        className="h-11 w-11 shrink-0 rounded-xl border border-[#d8dce3] bg-white text-navy text-xs font-bold"
+                        onClick={(e: { currentTarget: HTMLButtonElement }) => {
+                          const link = `${base}/join/${p.invite_token}`;
+                          navigator.clipboard.writeText(link);
+                          const orig = e.currentTarget.textContent;
+                          e.currentTarget.textContent = "Copied!";
+                          setTimeout(() => { e.currentTarget.textContent = orig; }, 1500);
+                        }}
+                      >
+                        Copy
+                      </button>
+                    </div>
                   </Field>
                   <div className="grid grid-cols-2 gap-2">
-                    <form action={invite.bind(null, p.id)}>
-                      <Button type="submit" variant="ghost" className="w-full">{p.invited_at ? "Resend invite" : "Send invite"}</Button>
-                    </form>
                     <form action={removePlayer.bind(null, p.id)}>
-                      <Button type="submit" variant="danger" className="w-full">Remove</Button>
+                      <Button type="submit" variant="danger" className="w-full">Remove player</Button>
                     </form>
                   </div>
                 </div>
@@ -118,14 +126,6 @@ export default async function AdminTeamsPage({ searchParams }: { searchParams: P
           </Card>
         );
       })}
-
-      <form action={invite.bind(null, null)} className="flex flex-col gap-2">
-        <Button type="submit" disabled={!pending} className="flex w-full items-center justify-center gap-2">
-          <MailIcon size={18} />
-          Send {pending} pending invite{pending === 1 ? "" : "s"}
-        </Button>
-        <p className="text-center text-xs text-muted">The invite email contains the app link. Share the event password separately.</p>
-      </form>
     </>
   );
 }

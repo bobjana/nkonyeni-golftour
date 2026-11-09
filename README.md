@@ -8,7 +8,7 @@ Mobile-first web app (installable PWA) for Ryder Cup–style golf tours. Organiz
 
 - Next.js 15 (App Router, server actions) + Tailwind CSS 4
 - Kysely query builder: **SQLite** locally via Node's built-in `node:sqlite` (no native build), **Postgres / Neon** in the cloud. The same portable schema is applied automatically on start-up.
-- Resend for invite emails · Docker → Google Cloud Run
+- Docker → Google Cloud Run
 
 ## Run locally
 
@@ -24,7 +24,7 @@ Open http://localhost:3000 and sign in as `organizer@example.com` with event pas
 
 - `npm run seed -- --reset` wipes the local DB and seeds a clean tour (no scores).
 - `npm test` runs the scoring-engine unit tests.
-- Without `RESEND_API_KEY`, invite links are printed to the server log and shown on **Organize → Teams** (expand a player).
+- Every player has a unique invite URL shown on **Organize → Teams** — copy and send it via WhatsApp for one-tap sign-in.
 
 ## Sample tour (seeded)
 
@@ -64,16 +64,14 @@ Teams: Medics and Business-Elites, 4 placeholder players each; the first player 
    ```bash
    printf '%s' "postgresql://…" | gcloud secrets create golftour-db --data-file=-
    openssl rand -base64 32 | tr -d '\n' | gcloud secrets create golftour-session --data-file=-
-   printf '%s' "re_…" | gcloud secrets create golftour-resend --data-file=-
    ```
    Grant the Cloud Run runtime service account `roles/secretmanager.secretAccessor` on them.
 4. **Deploy** (builds the Dockerfile with Cloud Build):
    ```bash
    gcloud run deploy nkonyeni-golftour --source . --region africa-south1 --allow-unauthenticated \
-     --set-secrets DATABASE_URL=golftour-db:latest,SESSION_SECRET=golftour-session:latest,RESEND_API_KEY=golftour-resend:latest \
-     --set-env-vars "EMAIL_FROM=Nkonyeni Golf Tour <golftour@yourdomain.com>,APP_URL=https://<your-service-url>"
+     --set-secrets DATABASE_URL=golftour-db:latest,SESSION_SECRET=golftour-session:latest \
+     --set-env-vars "APP_URL=https://<your-service-url>"
    ```
    Re-run with the real `APP_URL` once you know the service URL (or map a custom domain).
-5. In Resend, verify the sending domain used in `EMAIL_FROM`.
 
 Cloud Run scales to zero between tours. Set `--min-instances 1` during the tour days for instant loads on the course.

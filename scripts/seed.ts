@@ -12,6 +12,7 @@ import type { Database } from "../src/lib/db/types";
 const args = new Set(process.argv.slice(2));
 const now = () => new Date().toISOString();
 
+// ── Royal Swazi Spa (Day 1) ────────────────────────────────────────────────
 const PAR = [4, 4, 3, 4, 5, 3, 5, 4, 4, 4, 4, 5, 4, 3, 4, 4, 5, 3];
 const SI = [18, 4, 8, 6, 10, 14, 2, 16, 12, 9, 1, 17, 7, 15, 5, 11, 3, 13];
 const TEES = [
@@ -20,9 +21,19 @@ const TEES = [
   { name: "Red", rating: 66.4, slope: 121, lengths: [334, 366, 150, 280, 466, 157, 427, 302, 244, 272, 334, 453, 329, 109, 357, 363, 411, 150] },
 ];
 
+// ── Nkonyeni (Day 2 & 3) — https://www.golfhandicapp.com/courses/nkonyeni ──
+const NK_PAR = [4, 3, 4, 5, 4, 5, 3, 4, 3, 5, 3, 4, 4, 5, 4, 4, 4, 3];
+// SI: 1 = hardest, 18 = easiest, estimated from yardage relative to par
+const NK_SI = [9, 16, 6, 2, 13, 1, 8, 4, 18, 5, 14, 7, 17, 3, 15, 12, 11, 10];
+const NK_TEES = [
+  { name: "White", rating: 72.4, slope: 135, lengths: [387, 159, 436, 606, 384, 629, 171, 440, 138, 529, 167, 437, 307, 581, 349, 377, 378, 179], default: true },
+  { name: "Blue", rating: 70.4, slope: 132, lengths: [380, 153, 403, 600, 377, 528, 144, 407, 128, 505, 160, 411, 280, 553, 327, 370, 372, 164] },
+  { name: "White(w)", rating: 80.0, slope: 150, lengths: [387, 159, 436, 606, 384, 629, 171, 440, 138, 529, 167, 437, 307, 581, 349, 377, 378, 179] },
+];
+
 const TEAMS = [
-  { name: "Medics", color: "#C8102E", players: [["Sipho Dlamini", 8.2], ["Anna Kruger", 14.6], ["Thabo Nkosi", 11.0], ["Lize Venter", 22.0]] },
-  { name: "Business-Elites", color: "#1D5BBF", players: [["Ruan Botha", 5.1], ["Mandla Zulu", 18.0], ["Pieter Smit", 9.0], ["Nomsa Khumalo", 16.0]] },
+  { name: "Business Elite", color: "#1D5BBF", players: [["Jan Viljoen", 18], ["Vernon", 15], ["Johny", 20], ["Owen", 26]] },
+  { name: "Challenge", color: "#C8102E", players: [["Gerald", 21], ["Ras", 12], ["JP", 24], ["Deodat", 24]] },
 ] as const;
 
 const DAYS = [
@@ -55,10 +66,15 @@ async function main() {
   const eventId = newId();
   await db.insertInto("events").values({ id: eventId, name: "Nkonyeni Golf Tour 2026", password_hash: hashPassword(password), hidden_holes: 3, created_at: now() }).execute();
 
-  const courseId = newId();
-  await db.insertInto("courses").values({ id: courseId, event_id: eventId, name: "Royal Swazi Spa" }).execute();
-  await db.insertInto("holes").values(PAR.map((par, i) => ({ course_id: courseId, number: i + 1, par, si: SI[i] }))).execute();
-  await db.insertInto("tees").values(TEES.map((t) => ({ id: newId(), course_id: courseId, name: t.name, rating: t.rating, slope: t.slope, lengths: JSON.stringify(t.lengths), is_default: "default" in t ? 1 : 0 }))).execute();
+  const courseId1 = newId();
+  await db.insertInto("courses").values({ id: courseId1, event_id: eventId, name: "Royal Swazi Spa" }).execute();
+  await db.insertInto("holes").values(PAR.map((par, i) => ({ course_id: courseId1, number: i + 1, par, si: SI[i] }))).execute();
+  await db.insertInto("tees").values(TEES.map((t) => ({ id: newId(), course_id: courseId1, name: t.name, rating: t.rating, slope: t.slope, lengths: JSON.stringify(t.lengths), is_default: "default" in t ? 1 : 0 }))).execute();
+
+  const courseId2 = newId();
+  await db.insertInto("courses").values({ id: courseId2, event_id: eventId, name: "Nkonyeni" }).execute();
+  await db.insertInto("holes").values(NK_PAR.map((par, i) => ({ course_id: courseId2, number: i + 1, par, si: NK_SI[i] }))).execute();
+  await db.insertInto("tees").values(NK_TEES.map((t) => ({ id: newId(), course_id: courseId2, name: t.name, rating: t.rating, slope: t.slope, lengths: JSON.stringify(t.lengths), is_default: "default" in t ? 1 : 0 }))).execute();
 
   const playerIds: string[][] = [];
   for (const [ti, team] of TEAMS.entries()) {
@@ -76,10 +92,11 @@ async function main() {
     playerIds.push(ids);
   }
 
+  const courseForDay = [courseId1, courseId2, courseId2];
   const sessionIds: string[] = [];
   for (const [di, day] of DAYS.entries()) {
     const dayId = newId();
-    await db.insertInto("days").values({ id: dayId, event_id: eventId, number: di + 1, date: day.date, course_id: courseId, revealed_at: null }).execute();
+    await db.insertInto("days").values({ id: dayId, event_id: eventId, number: di + 1, date: day.date, course_id: courseForDay[di], revealed_at: null }).execute();
     for (const s of day.sessions) {
       const id = newId();
       await db.insertInto("sessions").values({ id, day_id: dayId, slot: s.slot, format: s.format, holes: s.holes, nine: s.nine, tee_time: s.tee, pairing_deadline: null, status: "draft" }).execute();
@@ -123,18 +140,18 @@ async function demo(sessionIds: string[], [med, biz]: string[][]) {
   }
   const put = (match_id: string, entity_id: string, hole: number, strokes: number) =>
     db.insertInto("scores").values({ match_id, entity_id, hole, strokes, updated_at: ts, updated_by: "seed" }).execute();
-  const randomGross = (hole: number) => PAR[hole - 1] + Math.floor(rand() * 3);
+  const randomGross = (hole: number, pars: number[]) => pars[hole - 1] + Math.floor(rand() * 3);
 
-  // Day 1: complete and revealed
-  for (const m of await setup(sessionIds[0])) for (let h = 1; h <= 18; h++) for (const p of m.players) await put(m.id, p, h, randomGross(h));
+  // Day 1: complete and revealed (Royal Swazi Spa)
+  for (const m of await setup(sessionIds[0])) for (let h = 1; h <= 18; h++) for (const p of m.players) await put(m.id, p, h, randomGross(h, PAR));
   await db.updateTable("sessions").set({ status: "complete" }).where("id", "=", sessionIds[0]).execute();
   await db.updateTable("days").set({ revealed_at: ts }).where("id", "=", days[0].id).execute();
 
-  // Day 2 AM: live. Match 1 is the mockup's hole-by-hole card thru 12; match 2 random thru 10.
+  // Day 2 AM: live (Nkonyeni). Match 1 card thru 12; match 2 random thru 10.
   const [m1, m2] = await setup(sessionIds[1]);
   const card = [[4, 5, 5, 5], [5, 6, 4, 6], [3, 4, 3, 5], [5, 4, 4, 5], [5, 5, 5, 6], [4, 4, 3, 4], [5, 6, 5, 5], [5, 5, 4, 5], [4, 5, 5, 6], [5, 6, 4, 6], [5, 5, 5, 6], [5, 6, 5, 6]];
   for (const [i, row] of card.entries()) for (const [j, p] of m1.players.entries()) await put(m1.id, p, i + 1, row[j]);
-  for (let h = 1; h <= 10; h++) for (const p of m2.players) await put(m2.id, p, h, randomGross(h));
+  for (let h = 1; h <= 10; h++) for (const p of m2.players) await put(m2.id, p, h, randomGross(h, NK_PAR));
   await db.updateTable("sessions").set({ status: "live" }).where("id", "=", sessionIds[1]).execute();
 }
 

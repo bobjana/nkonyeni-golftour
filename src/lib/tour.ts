@@ -251,6 +251,7 @@ export async function loadTour(eventId: string, viewer: PlayerRow | null): Promi
 
         const pts = matchViews.reduce((acc, m) => ({ a: acc.a + m.points.a, b: acc.b + m.points.b }), { a: 0, b: 0 });
         const perSession = session.format === "singles" ? Math.floor(players.length / 2) : Math.floor(players.length / 4);
+        const visibleHoles = isOrganizer || day.revealed_at ? played.length : played.length - hidden.length;
         return {
           session,
           day,
@@ -258,7 +259,7 @@ export async function loadTour(eventId: string, viewer: PlayerRow | null): Promi
           hidden,
           matches: matchViews,
           points: pts,
-          available: (sm.length || perSession) * played.length,
+          available: (sm.length || perSession) * visibleHoles,
           pairings: sp,
         };
       });
