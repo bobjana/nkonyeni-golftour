@@ -6,7 +6,7 @@ import { hashPassword, requireOrganizer } from "@/lib/auth";
 import { newId, newToken } from "@/lib/crypto";
 import { getDb } from "@/lib/db";
 import type { Format } from "@/lib/db/types";
-import { sendInvite } from "@/lib/email";
+
 
 const str = (f: FormData, k: string) => String(f.get(k) ?? "").trim();
 const num = (f: FormData, k: string) => Number(f.get(k));
@@ -255,29 +255,6 @@ export async function removePlayer(playerId: string) {
   await db.updateTable("teams").set({ captain_id: null }).where("captain_id", "=", playerId).execute();
   await db.deleteFrom("players").where("id", "=", playerId).where("event_id", "=", org.event_id).execute();
   done("/admin/teams?saved=1");
-}
-
-/** Sends invites to one player, or to everyone not yet invited when playerId is null. */
-export async function invite(playerId: string | null) {
-  const { org, db } = await guard();
-  const event = await db.selectFrom("events").selectAll().where("id", "=", org.event_id).executeTakeFirstOrThrow();
-  const teams = await db.selectFrom("teams").selectAll().where("event_id", "=", org.event_id).execute();
-  let q = db.selectFrom("players").selectAll().where("event_id", "=", org.event_id);
-  q = playerId ? q.where("id", "=", playerId) : q.where("invited_at", "is", null);
-  const players = await q.execute();
-  let sent = 0;
-  let failed = 0;
-  for (const p of players) {
-    const r = await sendInvite(p, teams.find((t) => t.id === p.team_id)!, event);
-    if (r.error) {
-      console.error(r.error);
-      failed++;
-      continue;
-    }
-    if (r.sent) sent++;
-    await db.updateTable("players").set({ invited_at: new Date().toISOString() }).where("id", "=", p.id).execute();
-  }
-  done(`/admin/teams?invited=${sent}&failed=${failed}&total=${players.length}`);
 }
 
 // ── Courses ─────────────────────────────────────────────────────────────────
