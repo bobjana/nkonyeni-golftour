@@ -3,6 +3,7 @@ import { currentTour } from "@/lib/current";
 import type { PlayerRow, TeamRow } from "@/lib/db/types";
 import { appUrl } from "@/lib/email";
 import { removePlayer, savePlayer, updateTeam } from "../actions";
+import { InviteLinkField } from "./InviteLinkField";
 
 export const dynamic = "force-dynamic";
 
@@ -70,29 +71,7 @@ export default async function AdminTeamsPage({ searchParams }: { searchParams: P
                 </summary>
                 <div className="flex flex-col gap-3 pt-3">
                   <PlayerForm team={team} p={p} />
-                  <Field label="Invite link — copy and send on WhatsApp">
-                    <div className="flex items-center gap-2">
-                      <input
-                        readOnly
-                        value={`${base}/join/${p.invite_token}`}
-                        className={`${inputCls} flex-1 cursor-pointer select-all text-[13px] font-mono`}
-                        onClick={(e: { currentTarget: HTMLInputElement }) => e.currentTarget.select()}
-                      />
-                      <button
-                        type="button"
-                        className="h-11 w-11 shrink-0 rounded-xl border border-[#d8dce3] bg-white text-navy text-xs font-bold"
-                        onClick={(e: { currentTarget: HTMLButtonElement }) => {
-                          const link = `${base}/join/${p.invite_token}`;
-                          navigator.clipboard.writeText(link);
-                          const orig = e.currentTarget.textContent;
-                          e.currentTarget.textContent = "Copied!";
-                          setTimeout(() => { e.currentTarget.textContent = orig; }, 1500);
-                        }}
-                      >
-                        Copy
-                      </button>
-                    </div>
-                  </Field>
+                  <InviteLinkField url={`${base}/join/${p.invite_token}`} base={base} />
                   <div className="grid grid-cols-2 gap-2">
                     <form action={removePlayer.bind(null, p.id)}>
                       <Button type="submit" variant="danger" className="w-full">Remove player</Button>
