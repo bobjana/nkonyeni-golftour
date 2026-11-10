@@ -27,12 +27,14 @@ env:
   #                   Attach the instance with --add-cloudsql-instances (see scripts/deploy.sh).
   #                   Neon URL kept as rollback only.
   # SESSION_SECRET  — cookie signing secret (required, 32+ chars)
-  # APP_URL         — public URL of the deployed service (used in invite links)
+  # APP_URL         — public URL of the deployed service (used in invite links).
+  #                  Required in production. Must be set via --env-vars-file or --set-env-vars.
+  #                  DO NOT set a static value here — it would stale and silently override deploy.env.
 
   # Placeholders — override before deploy:
   DATABASE_URL: "postgresql://golftour:pass@localhost/golftour?host=/cloudsql/nkonyeni-golftour:africa-south1:golftour-pg"
   SESSION_SECRET: ""
-  APP_URL: "https://nkonyeni-golftour-r4ex5asdfa-africa-south1.anira.app"
+  APP_URL: ""
 
 # Minimum instances = 0 (cold-start allowed).  Adjust as traffic grows.
 minInstances: 0
