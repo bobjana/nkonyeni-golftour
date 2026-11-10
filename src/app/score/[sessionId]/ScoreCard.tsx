@@ -671,21 +671,23 @@ export function ScoreCard({
                   );
                 })}
 
-                {/* Hole result bar */}
-                <div
-                  className="rounded-xl px-3.5 py-3 text-center text-sm font-bold text-white"
-                  style={{
-                    background: r === "A" ? teams[0].color : r === "B" ? teams[1].color : "#5b6472",
-                  }}
-                >
-                  {r === "A"
-                    ? `${teams[0].name} win the hole`
-                    : r === "B"
-                      ? `${teams[1].name} win the hole`
-                      : "Hole halved"}{" "}
-                  ({show(r === "B" ? nb : na)} v {show(r === "B" ? na : nb)}) →{" "}
-                  {fmtPts(after.a)} – {fmtPts(after.b)}
-                </div>
+                {/* Hole result bar — only once all players are captured */}
+                {allOnHoleCaptured(hole.number) && (
+                  <div
+                    className="rounded-xl px-3.5 py-3 text-center text-sm font-bold text-white"
+                    style={{
+                      background: r === "A" ? teams[0].color : r === "B" ? teams[1].color : "#5b6472",
+                    }}
+                  >
+                    {r === "A"
+                      ? `${teams[0].name} win the hole`
+                      : r === "B"
+                        ? `${teams[1].name} win the hole`
+                        : "Hole halved"}{" "}
+                    ({show(r === "B" ? nb : na)} v {show(r === "B" ? na : nb)}) →{" "}
+                    {fmtPts(after.a)} – {fmtPts(after.b)}
+                  </div>
+                )}
               </section>
             );
           })}
@@ -703,7 +705,7 @@ export function ScoreCard({
             aria-label="Previous hole"
             className="h-14 rounded-2xl border border-[#d8dce3] bg-white text-sm font-bold text-navy disabled:opacity-40 active:opacity-90"
           >
-            ← Back
+            ← Previous
           </button>
 
           {/* Save — enabled only when all scores on this hole are captured */}
@@ -731,7 +733,7 @@ export function ScoreCard({
             aria-label="Next hole"
             className="h-14 rounded-2xl bg-navy text-sm font-bold text-white disabled:opacity-40 active:opacity-90"
           >
-            Forward →
+            Next →
           </button>
         </div>
       )}
