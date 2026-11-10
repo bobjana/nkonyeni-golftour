@@ -42,6 +42,16 @@ export function hiddenHoleNumbers(played: number[], n: number): number[] {
 }
 
 /**
+ * Hidden holes per session for one day, in canonical order (AM before PM):
+ * only the day's LAST session hides its closing `n` holes. Everything earlier
+ * in the day is fully visible, so suspense builds over the closing holes only.
+ */
+export function hiddenHolesForDay(sessionHoles: number[][], n: number): number[][] {
+  const last = sessionHoles.length - 1;
+  return sessionHoles.map((holes, i) => (i === last ? hiddenHoleNumbers(holes, n) : []));
+}
+
+/**
  * Strokes each match entity receives over the session. `courseHcps` is one
  * entry per entity: a player's course handicap, or for foursomes the two
  * partners' course handicaps. Strokes are given off the lowest entity.

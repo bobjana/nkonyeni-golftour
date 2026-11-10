@@ -14,7 +14,7 @@ import type {
 } from "./db/types";
 import {
   courseHandicap,
-  hiddenHoleNumbers,
+  hiddenHolesForDay,
   holeWinner,
   matchStrokes,
   pointsFor,
@@ -171,11 +171,15 @@ export async function loadTour(eventId: string, viewer: PlayerRow | null): Promi
     };
     const daySessions = sessions
       .filter((s) => s.day_id === day.id)
-      .sort((a, b) => slotOrder[a.slot] - slotOrder[b.slot])
-      .map((session): SessionView => {
-        const nums = sessionHoleNumbers(session.holes, session.nine);
+      .sort((a, b) => slotOrder[a.slot] - slotOrder[b.slot]);
+    const dayHoleNumbers = daySessions.map((s) => sessionHoleNumbers(s.holes, s.nine));
+    // Hidden holes are a day-level decision: only the day's last session hides its closing holes.
+    const hiddenBySession = hiddenHolesForDay(dayHoleNumbers, event.hidden_holes);
+    const sessionViews = daySessions
+      .map((session, si): SessionView => {
+        const nums = dayHoleNumbers[si];
         const played = course.holes.filter((h) => nums.includes(h.number));
-        const hidden = hiddenHoleNumbers(nums, event.hidden_holes);
+        const hidden = hiddenBySession[si];
         const sp = pairings.filter((p) => p.session_id === session.id);
         const sm = matches.filter((m) => m.session_id === session.id);
 
@@ -263,8 +267,8 @@ export async function loadTour(eventId: string, viewer: PlayerRow | null): Promi
           pairings: sp,
         };
       });
-    const pts = daySessions.reduce((acc, s) => ({ a: acc.a + s.points.a, b: acc.b + s.points.b }), { a: 0, b: 0 });
-    return { day, course, sessions: daySessions, points: pts };
+    const pts = sessionViews.reduce((acc, s) => ({ a: acc.a + s.points.a, b: acc.b + s.points.b }), { a: 0, b: 0 });
+    return { day, course, sessions: sessionViews, points: pts };
   });
 
   const allSessions = dayViews.flatMap((d) => d.sessions);

@@ -12,11 +12,11 @@ const input: PlanInput = {
   days: [
     { id: "d1", number: 1, sessions: [{ id: "s1", slot: "PM", format: "better_ball", played: all, hidden: [16, 17, 18] }] },
     { id: "d2", number: 2, sessions: [
-      { id: "s2", slot: "AM", format: "better_ball", played: all, hidden: [16, 17, 18] },
+      { id: "s2", slot: "AM", format: "better_ball", played: all, hidden: [] },
       { id: "s3", slot: "PM", format: "foursomes", played: front, hidden: [7, 8, 9] },
     ] },
     { id: "d3", number: 3, sessions: [
-      { id: "s4", slot: "AM", format: "singles", played: all, hidden: [16, 17, 18] },
+      { id: "s4", slot: "AM", format: "singles", played: all, hidden: [] },
       { id: "s5", slot: "PM", format: "foursomes", played: front.map((h) => h + 9), hidden: [16, 17, 18] },
     ] },
   ],
@@ -50,6 +50,11 @@ describe("demo plan", () => {
     expect(reveals.map((x) => x.kind === "reveal" && x.day)).toEqual(["d1", "d2", "d3"]);
     const lastComplete = a.findLastIndex((x) => x.kind === "complete" && x.session === "s3");
     expect(a.findIndex((x) => x.kind === "reveal" && x.day === "d2")).toBeGreaterThan(lastComplete);
+  });
+
+  it("only the day's last session hides holes", () => {
+    const hiddenMoments = a.filter((x) => x.kind === "hole" && x.moment?.startsWith("Hidden holes begin"));
+    expect(hiddenMoments.map((x) => ("session" in x ? x.session : ""))).toEqual(["s1", "s3", "s5"]);
   });
 
   it("pairs every player once per session and picks a scorer from the group", () => {
