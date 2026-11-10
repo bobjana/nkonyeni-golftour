@@ -48,7 +48,7 @@ const DAYS = [
   ] },
 ] as const;
 
-const TABLES: (keyof Database)[] = ["score_log", "scores", "matches", "pairings", "sessions", "days", "holes", "tees", "courses", "players", "teams", "events"];
+const TABLES: (keyof Database)[] = ["score_checks", "score_log", "scores", "matches", "pairings", "sessions", "days", "holes", "tees", "courses", "players", "teams", "events"];
 
 async function main() {
   const db = await getDb();

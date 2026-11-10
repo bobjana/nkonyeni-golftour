@@ -72,6 +72,7 @@ async function resetPlay(eventId: string) {
   if (sessionIds.length) {
     const matchIds = (await db.selectFrom("matches").select("id").where("session_id", "in", sessionIds).execute()).map((m) => m.id);
     if (matchIds.length) {
+      await db.deleteFrom("score_checks").where("match_id", "in", matchIds).execute();
       await db.deleteFrom("score_log").where("match_id", "in", matchIds).execute();
       await db.deleteFrom("scores").where("match_id", "in", matchIds).execute();
     }
