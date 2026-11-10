@@ -29,11 +29,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ tok
     await db.updateTable("players").set({ joined_at: new Date().toISOString() }).where("id", "=", player.id).execute();
   }
   // Set the session cookie and redirect to the app home
-  return new NextResponse(null, {
-    status: 302,
-    headers: {
-      Location: "/",
-      "Set-Cookie": cookieHeader(player.id),
-    },
-  });
+  const response = NextResponse.redirect(new URL("/", _request.url));
+  response.headers.set("Set-Cookie", cookieHeader(player.id));
+  return response;
 }
