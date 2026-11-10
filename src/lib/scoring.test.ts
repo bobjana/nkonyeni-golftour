@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   courseHandicap,
   fmtPts,
+  hiddenHolesForDay,
   hiddenHoleNumbers,
   holeWinner,
   matchStrokes,
@@ -62,6 +63,21 @@ describe("holes in play", () => {
     expect(sessionHoleNumbers(9, "back")).toEqual([10, 11, 12, 13, 14, 15, 16, 17, 18]);
     expect(sessionHoleNumbers(18, "back")).toHaveLength(18);
     expect(hiddenHoleNumbers(sessionHoleNumbers(9, "front"), 3)).toEqual([7, 8, 9]);
+  });
+
+  it("only the day's LAST session hides its closing holes", () => {
+    const am = sessionHoleNumbers(18, "front");
+    const pm = sessionHoleNumbers(9, "front");
+    // AM + PM day: the AM session is fully visible, only PM hides its closing 3.
+    expect(hiddenHolesForDay([am, pm], 3)).toEqual([[], [7, 8, 9]]);
+    // Order matters: the final session is the one that hides.
+    expect(hiddenHolesForDay([pm, am], 3)).toEqual([[], [16, 17, 18]]);
+    // A single-session day still hides its closing holes.
+    expect(hiddenHolesForDay([am], 3)).toEqual([[16, 17, 18]]);
+    expect(hiddenHolesForDay([pm], 3)).toEqual([[7, 8, 9]]);
+    // n = 0 (or no sessions) hides nothing.
+    expect(hiddenHolesForDay([am, pm], 0)).toEqual([[], []]);
+    expect(hiddenHolesForDay([], 3)).toEqual([]);
   });
 });
 

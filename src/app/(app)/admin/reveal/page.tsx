@@ -19,7 +19,9 @@ export default async function RevealPage({ searchParams }: { searchParams: Promi
   const day = days.find((d) => d.day.id === sp.day) ?? days.find((d) => !d.day.revealed_at) ?? days.at(-1);
   if (!day) return <Flash tone="red">No sessions have been played yet.</Flash>;
   const pubDay = publicView.days.find((d) => d.day.id === day.day.id)!;
-  const hiddenRows = day.sessions.flatMap((s) => s.matches.map((m) => ({ s, m, cells: m.holes.filter((h) => h.hiddenHole) })));
+  const hiddenRows = day.sessions
+    .filter((s) => s.hidden.length > 0)
+    .flatMap((s) => s.matches.map((m) => ({ s, m, cells: m.holes.filter((h) => h.hiddenHole) })));
   const hiddenPts = hiddenRows.reduce((a, r) => a + r.cells.length, 0);
   const [ta, tb] = tour.teams;
   const revealed = !!day.day.revealed_at;
@@ -41,7 +43,7 @@ export default async function RevealPage({ searchParams }: { searchParams: Promi
         <span className="font-display text-base font-bold tracking-[4px] text-gold">DAY {day.day.number} · {dayDate(day).toUpperCase()}</span>
         <h1 className="font-display text-5xl leading-none font-bold">GRAND REVEAL</h1>
         <span className="text-sm text-mist">
-          {revealed ? "Revealed to everyone" : `${hiddenPts} hidden hole results · ${hiddenPts} points still to come`}
+          {revealed ? "Revealed to everyone" : hiddenPts ? `${hiddenPts} hidden hole results · ${hiddenPts} points still to come` : "No hidden results yet — cards are fully visible"}
         </span>
       </div>
 
