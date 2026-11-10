@@ -20,6 +20,9 @@ export const LockIcon = ({ size, className }: P) => (
 export const BackIcon = ({ size, className }: P) => (
   <svg {...base(size)} className={className}><path d="M15 18l-6-6 6-6" /></svg>
 );
+export const HomeIcon = ({ size, className }: P) => (
+  <svg {...base(size)} className={className}><path d="M3 10.5 12 3l9 7.5" /><path d="M5 9.5V21h14V9.5" /><path d="M9 21v-6h6v6" /></svg>
+);
 export const NextIcon = ({ size, className }: P) => (
   <svg {...base(size)} className={className}><path d="M9 18l6-6-6-6" /></svg>
 );

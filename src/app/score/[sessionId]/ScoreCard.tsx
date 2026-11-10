@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { BackIcon, CheckIcon, LockIcon, OfflineIcon } from "@/components/icons";
+import { CheckIcon, HomeIcon, LockIcon, OfflineIcon } from "@/components/icons";
 import type { Format } from "@/lib/db/types";
 import { bestNet, fmtPts, holeWinner, pointsFor, type HoleWinner } from "@/lib/scoring";
 
@@ -387,11 +387,10 @@ export function ScoreCard({
           </span>
         </div>
 
-        {/* ── Live tally link + status ──────────────────────────── */}
+        {/* ── Home link + status ──────────────────────────────── */}
         <div className="flex items-center justify-between gap-2">
-          <Link href="/live" className="flex items-center gap-1 text-[13px] font-semibold">
-            <BackIcon size={16} />
-            Live tally
+          <Link href="/live" aria-label="Home" className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white">
+            <HomeIcon size={16} />
           </Link>
           <span className="truncate text-xs text-mist">{title}</span>
           {status}
