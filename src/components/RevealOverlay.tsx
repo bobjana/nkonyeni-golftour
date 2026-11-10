@@ -13,6 +13,7 @@ export function RevealOverlay({
   teams,
   day,
   tour,
+  scope,
 }: {
   dayKey: string;
   revealedAt: string;
@@ -20,6 +21,8 @@ export function RevealOverlay({
   teams: { name: string; color: string }[];
   day: Pts;
   tour: Pts;
+  /** "day" when every session in the day has finished; "session" for a mid-day reveal. */
+  scope: "day" | "session";
 }) {
   const [phase, setPhase] = useState<"hidden" | "drum" | "result">("hidden");
 
@@ -55,7 +58,7 @@ export function RevealOverlay({
         </div>
       ) : (
         <div className="animate-pop flex w-full max-w-sm flex-col gap-5">
-          <p className="text-lg font-semibold">{winner ? `${winner.name} win the day!` : "The day is halved!"}</p>
+          <p className="text-lg font-semibold">{winner ? `${winner.name} win the ${scope}!` : `The ${scope} is halved!`}</p>
           <div className="grid grid-cols-2 gap-3">
             {teams.map((t, i) => (
               <div key={t.name} className="flex flex-col gap-1 rounded-2xl p-4" style={{ background: t.color }}>
