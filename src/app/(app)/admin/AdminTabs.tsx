@@ -8,6 +8,7 @@ const TABS = [
   { href: "/admin/teams", label: "Teams" },
   { href: "/admin/courses", label: "Courses" },
   { href: "/admin/reveal", label: "Approve" },
+  { href: "/admin/checklist", label: "Checklist" },
   { href: "/admin/demo", label: "Demo" },
 ];
 
@@ -15,7 +16,7 @@ export function AdminTabs({ demo }: { demo: boolean }) {
   const path = usePathname();
   const tabs = demo ? TABS : TABS.filter((t) => t.href !== "/admin/demo");
   return (
-    <nav className={`grid gap-1.5 ${demo ? "grid-cols-5" : "grid-cols-4"}`}>
+    <nav className={`grid gap-1.5 ${demo ? "grid-cols-6" : "grid-cols-5"}`}>
       {tabs.map((t) => {
         const active = t.href === "/admin" ? path === "/admin" || path.startsWith("/admin/sessions") : path.startsWith(t.href);
         return (
