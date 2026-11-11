@@ -48,7 +48,10 @@ const DAYS = [
   ] },
 ] as const;
 
-const TABLES: (keyof Database)[] = ["score_checks", "score_log", "scores", "matches", "pairings", "sessions", "days", "holes", "tees", "courses", "players", "teams", "events"];
+// Delete order matters: children before parents. `demo` references `events` and is
+// not optional — leaving it in place fails the events delete on Postgres (the
+// SQLite adapter does not enforce foreign keys, so this only bites in production).
+const TABLES: (keyof Database)[] = ["demo", "score_checks", "score_log", "scores", "matches", "pairings", "sessions", "days", "holes", "tees", "courses", "players", "teams", "events"];
 
 async function main() {
   const db = await getDb();
