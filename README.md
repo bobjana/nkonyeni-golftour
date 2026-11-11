@@ -38,6 +38,13 @@ Open http://localhost:3000 and sign in as `organizer@example.com` with event pas
 
 Teams: Medics and Business-Elites, 4 placeholder players each; the first player of each team is captain. Royal Swazi Spa par/SI and White/Blue/Red tee ratings come from the published scorecard, with Blue as the default tee. Edit names, emails and handicaps on **Organize → Teams**.
 
+## Player guide videos
+
+Two captioned walkthroughs (scorecard + where to follow live coverage) are generated from the
+real app, not screen-grabbed by hand: `just video` seeds a scratch DB, builds, records with
+Playwright and assembles `video/out/main.mp4` (~75 s) and `video/out/teaser.mp4` (~21 s).
+Script, storyboard and editing notes: [docs/video/script.md](docs/video/script.md).
+
 ## How a session runs
 
 1. **Organize → Event → session → "Open pairings to captains"**. Captains see a banner and submit pairs (or singles order) blind. The organizer can also set pairings for either team.

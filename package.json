@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "seed": "node --env-file-if-exists=.env.local --import tsx scripts/seed.ts",
-    "test": "vitest run"
+    "test": "vitest run",
+    "video": "node --import tsx scripts/make-video.ts"
   },
   "dependencies": {
     "kysely": "^0.29.8",
@@ -27,6 +28,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "15.5.29",
+    "playwright": "^1.65.0",
     "tailwindcss": "^4",
     "tsx": "^4.23.15",
     "typescript": "^5",
