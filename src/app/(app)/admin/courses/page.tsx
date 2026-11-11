@@ -26,7 +26,7 @@ export default async function AdminCoursesPage({ searchParams }: { searchParams:
         </div>
       )}
       {c && (
-        <form action={saveCourse.bind(null, c.course.id)} className="flex flex-col gap-3">
+        <form key={c.course.id} action={saveCourse.bind(null, c.course.id)} className="flex flex-col gap-3">
           <Card>
             <div className="flex items-end gap-2.5">
               <Field label="Course" className="flex-1">
