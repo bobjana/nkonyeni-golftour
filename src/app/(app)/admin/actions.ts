@@ -186,7 +186,7 @@ export async function setReveal(dayId: string, reveal: boolean) {
 }
 
 /** Settles a hole where group members' cards disagree: the chosen score counts. */
-export async function resolveScore(matchId: string, entityId: string, hole: number, dayId: string, strokes: number) {
+export async function resolveScore(matchId: string, entityId: string, hole: number, strokes: number) {
   const { org, db } = await guard();
   const match = await db.selectFrom("matches").select(["id", "session_id"]).where("id", "=", matchId).executeTakeFirstOrThrow();
   await ownSession(match.session_id, org.event_id);
@@ -202,7 +202,12 @@ export async function resolveScore(matchId: string, entityId: string, hole: numb
     .onConflict((oc) => oc.columns(["match_id", "entity_id", "hole"]).doUpdateSet({ strokes, resolved_by: org.id, resolved_at: at }))
     .execute();
   await db.insertInto("score_log").values({ id: newId(), match_id: matchId, entity_id: entityId, hole, strokes, at, actor: `ruling:${org.id}` }).execute();
-  done(`/admin/reveal?day=${dayId}&saved=check`);
+  // Deliberately NO revalidatePath/redirect here: revalidating would make Next.js
+  // swap in a fresh RSC payload in this POST response, killing the green 1s beat in
+  // ScoreChecks. Freshness is instead restored by router.refresh() after that beat —
+  // every page is force-dynamic, so no data cache goes stale. Do not "fix" this back
+  // without moving the revalidation into the client's post-animation refresh.
+  return { ok: true };
 }
 
 // ── Teams and players ───────────────────────────────────────────────────────
