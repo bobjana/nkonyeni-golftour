@@ -5,7 +5,7 @@ import { Scoreboard } from "@/components/Scoreboard";
 import { currentTour } from "@/lib/current";
 import { fmtPts } from "@/lib/scoring";
 import { playersOf } from "@/lib/tour";
-import { sessionDetail, sessionTitle, toWin } from "@/lib/view";
+import { dayComplete, latestCompleteSession, sessionDetail, sessionTitle, toWin } from "@/lib/view";
 
 export const dynamic = "force-dynamic";
 
@@ -24,7 +24,14 @@ export default async function StandingsPage() {
   const scoring = next?.matches.some((m) => m.match.scorer_id === me.id);
   const inPlay = lastDay?.sessions.some((s) => s.session.status !== "complete");
   const afterLabel = !lastDay ? "Before play" : inPlay ? `Day ${lastDay.day.number} in progress` : `After Day ${lastDay.day.number}`;
-  const dayWinner = lastDay && lastDay.points.a !== lastDay.points.b ? (lastDay.points.a > lastDay.points.b ? tour.teams[0] : tour.teams[1]) : null;
+  // The recap line names the day when every session has finished; otherwise the latest finished session.
+  // With no finished session there is no result to name, so the line is skipped.
+  const dayDone = lastDay ? dayComplete(lastDay) : false;
+  const lastSession = lastDay && !dayDone ? latestCompleteSession(lastDay) : undefined;
+  const recap = lastDay && (dayDone || lastSession)
+    ? { scope: dayDone ? "day" : "session", pts: dayDone ? lastDay.points : lastSession!.points }
+    : null;
+  const dayWinner = recap && recap.pts.a !== recap.pts.b ? (recap.pts.a > recap.pts.b ? tour.teams[0] : tour.teams[1]) : null;
 
   return (
     <div className="flex flex-col">
@@ -64,13 +71,13 @@ export default async function StandingsPage() {
             {lastDay.day.revealed_at && (
               <div className="flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-semibold" style={{ background: "#f4f1ea" }}>
                 <TrophyIcon size={20} className="text-gold-ink" />
-                {dayWinner ? (
+                {dayWinner && recap ? (
                   <span style={{ color: dayWinner.color }}>
-                    {dayWinner.name} won the day {fmtPts(Math.max(lastDay.points.a, lastDay.points.b))} – {fmtPts(Math.min(lastDay.points.a, lastDay.points.b))}
+                    {dayWinner.name} won the {recap.scope} {fmtPts(Math.max(recap.pts.a, recap.pts.b))} – {fmtPts(Math.min(recap.pts.a, recap.pts.b))}
                   </span>
-                ) : (
-                  <span>Day halved {fmtPts(lastDay.points.a)} – {fmtPts(lastDay.points.b)}</span>
-                )}
+                ) : recap ? (
+                  <span>{recap.scope === "day" ? "Day" : "Session"} halved {fmtPts(recap.pts.a)} – {fmtPts(recap.pts.b)}</span>
+                ) : null}
               </div>
             )}
             {lastDay.sessions.filter((s) => s.matches.length).map((s) => (

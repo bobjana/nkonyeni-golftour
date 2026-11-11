@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { dayConflicts } from "@/lib/score-checks";
-import type { Tour } from "@/lib/tour";
-import { sessionTitle } from "@/lib/view";
+import type { DayView, Tour } from "@/lib/tour";
+import { dayComplete, latestCompleteSession, sessionTitle } from "@/lib/view";
 import { RevealOverlay } from "./RevealOverlay";
 
 /** Captain and organizer to-dos and the post-reveal celebration, shown on the main player screens. */
@@ -12,6 +12,14 @@ export async function Notices({ tour }: { tour: Tour }) {
     ? tour.sessions.filter((s) => s.session.status === "pairing" && !s.pairings.some((p) => p.team_id === captainOf.id))
     : [];
   const revealed = [...tour.days].reverse().find((d) => d.day.revealed_at);
+  // A mid-day reveal celebrates the day's latest finished session; a complete day the day itself.
+  // If nothing has finished yet there is no result to celebrate, so the drumroll is skipped.
+  let reveal: { day: DayView; full: boolean; pts: { a: number; b: number } } | undefined;
+  if (revealed) {
+    const full = dayComplete(revealed);
+    const session = full ? undefined : latestCompleteSession(revealed);
+    if (full || session) reveal = { day: revealed, full, pts: full ? revealed.points : session!.points };
+  }
   // End of a day's play: tell the organizer about cards that disagree.
   const checks = [];
   if (v?.is_organizer) {
@@ -45,13 +53,14 @@ export async function Notices({ tour }: { tour: Tour }) {
           <span aria-hidden>→</span>
         </Link>
       ))}
-      {revealed && (
+      {reveal && (
         <RevealOverlay
-          dayKey={`${revealed.day.id}:${revealed.day.revealed_at}`}
-          revealedAt={revealed.day.revealed_at!}
-          dayNumber={revealed.day.number}
+          dayKey={`${reveal.day.day.id}:${reveal.day.day.revealed_at}`}
+          revealedAt={reveal.day.day.revealed_at!}
+          dayNumber={reveal.day.day.number}
           teams={tour.teams.map((t) => ({ name: t.name, color: t.color }))}
-          day={revealed.points}
+          day={reveal.pts}
+          scope={reveal.full ? "day" : "session"}
           tour={tour.points}
         />
       )}
