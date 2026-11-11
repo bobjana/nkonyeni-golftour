@@ -127,6 +127,16 @@ alias srd := seed-reset-demo
 db-clean:
     rm -f data/local.db
 
+# ─── Player guide videos ─────────────────────────────────────────────────────
+
+# Render the player-guide videos (main ~75 s + teaser ~21 s) from the real UI.
+#   one-off: npx playwright install chromium
+#   needs ffmpeg; uses a scratch DB (data/video-demo.db) and a spare port
+video flags="":
+    npm run video -- {{ flags }}
+
+alias vid := video
+
 # ─── Docker ──────────────────────────────────────────────────────────────────
 
 # Build Docker image

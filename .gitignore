@@ -44,3 +44,6 @@ data/
 .env*.local
 .env
 !.env.example
+video/out/
+video/.raw/
+video/.qa/
