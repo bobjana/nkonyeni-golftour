@@ -4,6 +4,8 @@ This manual is for the event organizer and is based on the **current schedule** 
 
 **Quick links:** the app runs at the URL you deployed to. Install it on phones (Add to Home Screen) so scorers can keep cards offline.
 
+**In-app checklist:** Organize → **Checklist** shows the same per-day steps with their times — items strike through once their time passes, and the ones still ahead can be ticked (ticks are saved on that device).
+
 ---
 
 ## 1. Quick reference
