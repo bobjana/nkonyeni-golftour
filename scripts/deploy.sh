@@ -78,6 +78,7 @@ else
   read -r -p "DATABASE_URL  (Neon): "       DATABASE_URL
   read -r -s -p "SESSION_SECRET (32+ chars): " SESSION_SECRET; echo ""
   read -r -p "APP_URL       (public URL): " APP_URL
+  read -r -p "DEMO_DISABLED (1 = hide Demo tab, blank = keep): " DEMO_DISABLED
 fi
 
 # ── step 3: build env-vars file ──────────────────────────────────────────────
@@ -85,6 +86,7 @@ fi
 DATABASE_URL="${DATABASE_URL:-}"
 SESSION_SECRET="${SESSION_SECRET:-}"
 APP_URL="${APP_URL:-}"
+DEMO_DISABLED="${DEMO_DISABLED:-}"
 
 ENV_VARS=()
 add_var() {
@@ -96,6 +98,7 @@ add_var NODE_ENV            production
 add_var DATABASE_URL        "$DATABASE_URL"
 add_var SESSION_SECRET      "$SESSION_SECRET"
 add_var APP_URL             "$APP_URL"
+add_var DEMO_DISABLED       "$DEMO_DISABLED"
 
 
 # Write env vars as YAML for gcloud
