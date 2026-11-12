@@ -557,10 +557,14 @@ export function ScoreCard({
               b: t.b + (r === "B" ? 1 : r === "H" ? 0.5 : 0),
             };
             const multi = m.sideA.length > 1;
+            // Every player in this match captured on this hole (server score or local
+            // capture). getStrokes() falls back to par for un-captured players, so
+            // bestNet() would otherwise hand out a "best ball" from defaults.
+            const matchCaptured = entityIdsOf(m).every((id) => isCaptured(m.id, id, hole.number));
             const counted = (side: CardEntity[], best: number | null) =>
               (e: CardEntity) =>
                 multi &&
-                (dirtyHoles.has(hole.number) || holeDone(scores, hole.number)) &&
+                matchCaptured &&
                 best !== null &&
                 best !== Infinity &&
                 getStrokes(m.id, e.id, hole.number) !== 0 &&
